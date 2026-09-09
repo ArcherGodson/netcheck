@@ -366,7 +366,44 @@ struct NetworkRow: View {
     }
 }
 
-struct NetworkEditView: View {
+struct ProtocolSelectionRow: View {
+    let protocolType: ProtocolType
+    @Binding var isSelected: Bool
+    let title: String
+    let description: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        Toggle(isOn: $isSelected) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundColor(color)
+                    .font(.title2)
+                
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(.primary)
+                    
+                    Text(description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(2)
+                }
+            }
+        }
+        .toggleStyle(.button)
+        .buttonStyle(.borderless)
+        .padding(8)
+        .background(isSelected ? color.opacity(0.1) : Color.clear)
+        .cornerRadius(8)
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(isSelected ? color : Color.clear, lineWidth: isSelected ? 2 : 0)
+        )
+    }
+}
 }
 
 struct NetworkEditView: View {
