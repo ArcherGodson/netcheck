@@ -8,7 +8,7 @@ class TrayIconManager: ObservableObject {
     var onConfigure: (() -> Void)?
     var onRefresh: (() -> Void)?
     
-    func updateTrayIcons(for networks: [NetworkCheck]) {
+    func updateTrayIcons(for networks: [Network]) {
         // Remove networks that no longer exist
         let currentIds = Set(networks.map { $0.id })
         let removedIds = Set(statusItems.keys).subtracting(currentIds)
@@ -27,7 +27,7 @@ class TrayIconManager: ObservableObject {
         }
     }
     
-    private func updateOrCreateStatusItem(for network: NetworkCheck) {
+    private func updateOrCreateStatusItem(for network: Network) {
         if let statusItem = statusItems[network.id] {
             // Update existing status item
             updateStatusItem(statusItem, for: network)
@@ -54,7 +54,7 @@ class TrayIconManager: ObservableObject {
         }
     }
     
-    private func updateStatusItem(_ statusItem: NSStatusItem, for network: NetworkCheck) {
+    private func updateStatusItem(_ statusItem: NSStatusItem, for network: Network) {
         let icon = createIcon(for: network.status, name: network.name)
         if let button = statusItem.button {
             button.image = icon
@@ -66,10 +66,13 @@ class TrayIconManager: ObservableObject {
                 return "Last check: \(formatter.string(from: $0))"
             } ?? "Not checked yet"
             
+            let availableChecks = network.checks.filter { $0.status == .available }.count
+            let totalChecks = network.checks.count
+            
             button.toolTip = """
             \(network.name)
-            Host: \(network.host)
             Status: \(statusString(for: network.status))
+            Checks: \(availableChecks)/\(totalChecks) available
             \(lastCheckTime)
             """
         }
@@ -138,7 +141,7 @@ class TrayIconManager: ObservableObject {
         }
     }
     
-    func updateMenu(for network: NetworkCheck) {
+    func updateMenu(for network: Network) {
         // Update the menu manager with new network data
         if let menuManager = menuManagers[network.id] {
             menuManager.network = network
@@ -152,7 +155,7 @@ class TrayIconManager: ObservableObject {
         }
     }
     
-    func refreshAllMenus(for networks: [NetworkCheck]) {
+    func refreshAllMenus(for networks: [Network]) {
         for network in networks {
             updateMenu(for: network)
         }
@@ -160,11 +163,11 @@ class TrayIconManager: ObservableObject {
 }
 
 class MenuManager {
-    var network: NetworkCheck
+    var network: Network
     var onConfigure: (() -> Void)?
     var onRefresh: (() -> Void)?
     
-    init(network: NetworkCheck) {
+    init(network: Network) {
         self.network = network
     }
     
@@ -177,16 +180,6 @@ class MenuManager {
         menu.addItem(titleItem)
         
         menu.addItem(NSMenuItem.separator())
-        
-        // Host information with detailed description
-        let hostItem = NSMenuItem(title: "Host: \(network.host)", action: nil, keyEquivalent: "")
-        hostItem.isEnabled = false
-        menu.addItem(hostItem)
-        
-        // Protocol information with detailed description
-        let protocolItem = NSMenuItem(title: "Protocols: \(network.getProtocolDescription())", action: nil, keyEquivalent: "")
-        protocolItem.isEnabled = false
-        menu.addItem(protocolItem)
         
         // Status
         let statusItem = NSMenuItem(title: "Status: \(statusString())", action: nil, keyEquivalent: "")
@@ -206,32 +199,12 @@ class MenuManager {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Protocol results with detailed information
-        for protocolType in network.protocols {
-            let result = network.protocolResults[protocolType] ?? false
-            let status = result ? "✓" : "✗"
-            
-            var protocolDescription = ""
-            switch protocolType {
-            case .customTCP:
-                if let port = network.customPort {
-                    protocolDescription = "\(status) \(protocolType.rawValue) (\(port))"
-                } else {
-                    protocolDescription = "\(status) \(protocolType.rawValue)"
-                }
-            case .dns:
-                // For DNS protocols, we can show more detailed information
-                protocolDescription = "\(status) DNS lookup"
-                if let port = network.customPort {
-                    protocolDescription += " (port \(port))"
-                }
-            default:
-                protocolDescription = "\(status) \(protocolType.rawValue)"
-            }
-            
-            let protocolItem = NSMenuItem(title: protocolDescription, action: nil, keyEquivalent: "")
-            protocolItem.isEnabled = false
-            menu.addItem(protocolItem)
+        // Check results
+        for check in network.checks {
+            let status = check.status == .available ? "✓" : "✗"
+            let checkItem = NSMenuItem(title: "\(status) \(check.description)", action: nil, keyEquivalent: "")
+            checkItem.isEnabled = false
+            menu.addItem(checkItem)
         }
         
         menu.addItem(NSMenuItem.separator())

@@ -43,7 +43,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         
         print("Application launched with \(config.networks.count) networks")
         for network in config.networks {
-            print("  - \(network.name) (\(network.host))")
+            print("  - \(network.name) (\(network.checks.count) checks)")
         }
         
         // Update tray icons
@@ -59,18 +59,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
     
     private func createDefaultConfiguration() {
-        let googleNetwork = NetworkCheck(
-            name: "Google",
-            host: "8.8.8.8",
-            protocols: [.icmp, .dns]
-        )
+        let googleNetwork = Network(name: "Google", checks: [
+            NetworkCheck(type: .icmp, host: "8.8.8.8"),
+            NetworkCheck(type: .dns, host: "google.com")
+        ])
         
-        let localNetwork = NetworkCheck(
-            name: "Local Router",
-            host: "192.168.1.1",
-            protocols: [.icmp, .tcp],
-            customPort: 80
-        )
+        let localNetwork = Network(name: "Local Router", checks: [
+            NetworkCheck(type: .icmp, host: "192.168.1.1"),
+            NetworkCheck(type: .tcp, host: "192.168.1.1", port: 80)
+        ])
         
         config.networks = [googleNetwork, localNetwork]
         Task {
@@ -87,7 +84,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
     
     private func performNetworkChecks() async {
-        var updatedNetworks: [NetworkCheck] = []
+        var updatedNetworks: [Network] = []
         
         for network in config.networks {
             let updatedNetwork = await NetworkMonitor.shared.checkNetwork(network)

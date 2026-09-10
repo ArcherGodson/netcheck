@@ -5,26 +5,26 @@ actor NetworkMonitor {
     
     private init() {}
     
-    func checkNetwork(_ network: NetworkCheck) async -> NetworkCheck {
-        var results: [ProtocolType: Bool] = [:]
+    func checkNetwork(_ network: Network) async -> Network {
+        var updatedChecks: [NetworkCheck] = []
         var availableCount = 0
         
-        for protocolType in network.protocols {
-            let result = await checkProtocol(protocolType, for: network)
-            results[protocolType] = result
-            if result {
+        for check in network.checks {
+            let result = await performCheck(check)
+            updatedChecks.append(result)
+            if result.status == .available {
                 availableCount += 1
             }
         }
         
         var updatedNetwork = network
-        updatedNetwork.protocolResults = results
+        updatedNetwork.checks = updatedChecks
         updatedNetwork.lastCheck = Date()
         
-        let totalProtocols = network.protocols.count
-        if totalProtocols == 0 {
+        let totalChecks = network.checks.count
+        if totalChecks == 0 {
             updatedNetwork.status = .unavailable
-        } else if availableCount == totalProtocols {
+        } else if availableCount == totalChecks {
             updatedNetwork.status = .available
         } else if availableCount > 0 {
             updatedNetwork.status = .partiallyAvailable
@@ -35,31 +35,47 @@ actor NetworkMonitor {
         return updatedNetwork
     }
     
-    private func checkProtocol(_ protocolType: ProtocolType, for network: NetworkCheck) async -> Bool {
-        switch protocolType {
+    private func performCheck(_ check: NetworkCheck) async -> NetworkCheck {
+        let result: Bool
+        
+        switch check.type {
         case .icmp:
-            return await checkICMP(host: network.host)
-        case .dns:
-            return await checkDNS(host: network.host)
+            result = await checkICMP(host: check.host)
         case .tcp:
-            return await checkTCP(host: network.host, port: network.customPort ?? 80)
-        case .ssh:
-            return await checkTCP(host: network.host, port: 22)
+            if let port = check.port {
+                result = await checkTCP(host: check.host, port: port)
+            } else {
+                result = false
+            }
+        case .dns:
+            if let dnsServer = check.dnsServer {
+                result = await checkDNS(host: check.host, dnsServer: dnsServer)
+            } else {
+                result = await checkDNS(host: check.host)
+            }
         case .http:
-            return await checkTCP(host: network.host, port: 80)
+            if let port = check.port {
+                result = await checkTCP(host: check.host, port: port)
+            } else {
+                result = await checkTCP(host: check.host, port: 80)
+            }
         case .https:
-            return await checkTCP(host: network.host, port: 443)
-        case .customTCP:
-            guard let port = network.customPort else { return false }
-            return await checkTCP(host: network.host, port: port)
+            result = await checkTCP(host: check.host, port: 443)
+        case .ssh:
+            result = await checkTCP(host: check.host, port: 22)
         }
+        
+        var updatedCheck = check
+        updatedCheck.status = result ? .available : .unavailable
+        updatedCheck.lastCheck = Date()
+        
+        return updatedCheck
     }
     
     private func checkICMP(host: String) async -> Bool {
         return await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/sbin/ping")
-            // Use -c for count and -W for timeout (macOS version)
             process.arguments = ["-c", "1", "-W", "2000", host]
             
             let pipe = Pipe()
@@ -76,16 +92,23 @@ actor NetworkMonitor {
         }
     }
     
-    private func checkDNS(host: String) async -> Bool {
+    private func checkDNS(host: String, dnsServer: String? = nil) async -> Bool {
         // Skip DNS check for IP addresses
         if isIPAddress(host) {
-            return true // Consider IP addresses as "DNS available"
+            return true
         }
         
         return await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/dig")
-            process.arguments = ["+short", "+timeout=2", host]
+            
+            var arguments = ["+short", "+timeout=2"]
+            if let dnsServer = dnsServer {
+                arguments.append("@\(dnsServer)")
+            }
+            arguments.append(host)
+            
+            process.arguments = arguments
             
             let pipe = Pipe()
             process.standardOutput = pipe
@@ -106,7 +129,6 @@ actor NetworkMonitor {
     }
     
     private func isIPAddress(_ host: String) -> Bool {
-        // Simple IPv4 address validation
         let ipv4Pattern = "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}$"
         if let regex = try? NSRegularExpression(pattern: ipv4Pattern) {
             let range = NSRange(location: 0, length: host.utf16.count)
@@ -128,8 +150,6 @@ actor NetworkMonitor {
             do {
                 try process.run()
                 process.waitUntilExit()
-                
-                // nc returns 0 if connection successful, 1 if failed
                 continuation.resume(returning: process.terminationStatus == 0)
             } catch {
                 continuation.resume(returning: false)

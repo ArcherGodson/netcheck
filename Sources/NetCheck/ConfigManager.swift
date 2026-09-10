@@ -17,11 +17,18 @@ class ConfigManager {
     }
     
     func loadConfig() -> AppConfig {
-        guard let data = try? Data(contentsOf: configURL),
-              let config = try? JSONDecoder().decode(AppConfig.self, from: data) else {
+        // Try to load config, if it fails or is incompatible, return default
+        guard let data = try? Data(contentsOf: configURL) else {
             return AppConfig()
         }
-        return config
+        
+        do {
+            return try JSONDecoder().decode(AppConfig.self, from: data)
+        } catch {
+            // If decoding fails (likely due to format change), return default config
+            print("Failed to decode config, using default: \(error)")
+            return AppConfig()
+        }
     }
     
     func saveConfig(_ config: AppConfig) async {

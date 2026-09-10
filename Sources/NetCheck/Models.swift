@@ -2,14 +2,82 @@ import Foundation
 import AppKit
 import SwiftUI
 
-enum ProtocolType: String, CaseIterable, Codable {
+enum CheckType: String, CaseIterable, Codable {
     case icmp = "ICMP"
-    case dns = "DNS"
     case tcp = "TCP"
-    case ssh = "SSH"
+    case dns = "DNS"
     case http = "HTTP"
     case https = "HTTPS"
-    case customTCP = "Custom TCP"
+    case ssh = "SSH"
+}
+
+enum CheckStatus: Equatable, Codable {
+    case available
+    case unavailable
+    
+    var color: NSColor {
+        switch self {
+        case .available:
+            return .systemGreen
+        case .unavailable:
+            return .systemRed
+        }
+    }
+    
+    var colorSwiftUI: Color {
+        switch self {
+        case .available:
+            return .green
+        case .unavailable:
+            return .red
+        }
+    }
+}
+
+struct NetworkCheck: Codable, Identifiable {
+    let id: UUID
+    var type: CheckType
+    var host: String
+    var port: Int?
+    var dnsServer: String?
+    var status: CheckStatus
+    var lastCheck: Date?
+    
+    init(type: CheckType, host: String, port: Int? = nil, dnsServer: String? = nil) {
+        self.id = UUID()
+        self.type = type
+        self.host = host
+        self.port = port
+        self.dnsServer = dnsServer
+        self.status = .unavailable
+        self.lastCheck = nil
+    }
+    
+    var description: String {
+        switch type {
+        case .icmp:
+            return "ICMP: \(host)"
+        case .tcp:
+            if let port = port {
+                return "TCP: \(host):\(port)"
+            }
+            return "TCP: \(host)"
+        case .dns:
+            if let dnsServer = dnsServer {
+                return "DNS: \(host) via \(dnsServer)"
+            }
+            return "DNS: \(host)"
+        case .http:
+            if let port = port {
+                return "HTTP: \(host):\(port)"
+            }
+            return "HTTP: \(host)"
+        case .https:
+            return "HTTPS: \(host)"
+        case .ssh:
+            return "SSH: \(host)"
+        }
+    }
 }
 
 enum NetworkStatus: Equatable, Codable {
@@ -40,79 +108,33 @@ enum NetworkStatus: Equatable, Codable {
     }
 }
 
-struct NetworkCheck: Codable, Identifiable {
+struct Network: Codable, Identifiable {
     let id: UUID
     var name: String
-    var host: String
-    var protocols: [ProtocolType]
-    var customPort: Int?
+    var checks: [NetworkCheck]
     var status: NetworkStatus
     var lastCheck: Date?
-    var protocolResults: [ProtocolType: Bool]
     
-    init(name: String, host: String, protocols: [ProtocolType], customPort: Int? = nil) {
+    init(name: String, checks: [NetworkCheck] = []) {
         self.id = UUID()
         self.name = name
-        self.host = host
-        self.protocols = protocols
-        self.customPort = customPort
+        self.checks = checks
         self.status = .unavailable
         self.lastCheck = nil
-        self.protocolResults = [:]
     }
     
     // Custom copy initializer for editing
-    init(from original: NetworkCheck) {
+    init(from original: Network) {
         self.id = original.id
         self.name = original.name
-        self.host = original.host
-        self.protocols = original.protocols
-        self.customPort = original.customPort
+        self.checks = original.checks
         self.status = original.status
         self.lastCheck = original.lastCheck
-        self.protocolResults = original.protocolResults
-    }
-    
-    // Вспомогательный метод для получения описания проверки
-    func getProtocolDescription() -> String {
-        let protocolDescriptions: [String] = protocols.map { protocolType in
-            switch protocolType {
-            case .icmp:
-                return "ICMP (ping)"
-            case .dns:
-                return "DNS lookup"
-            case .tcp:
-                return "TCP port check"
-            case .ssh:
-                return "SSH connection"
-            case .http:
-                return "HTTP request"
-            case .https:
-                return "HTTPS request"
-            case .customTCP:
-                if let port = customPort {
-                    return "Custom TCP port \(port)"
-                } else {
-                    return "Custom TCP port (no port specified)"
-                }
-            }
-        }
-        
-        return protocolDescriptions.joined(separator: ", ")
-    }
-    
-    // Вспомогательный метод для получения описания проверки с портом
-    func getDetailedDescription() -> String {
-        if protocols.contains(.customTCP), let port = customPort {
-            return "\(name) (\(host):\(port))"
-        } else {
-            return "\(name) (\(host))"
-        }
     }
 }
 
 struct AppConfig: Codable {
-    var networks: [NetworkCheck]
+    var networks: [Network]
     var checkInterval: TimeInterval // in seconds
     
     init() {
@@ -120,7 +142,7 @@ struct AppConfig: Codable {
         self.checkInterval = 30 // default 30 seconds
     }
     
-    init(networks: [NetworkCheck], checkInterval: TimeInterval) {
+    init(networks: [Network], checkInterval: TimeInterval) {
         self.networks = networks
         self.checkInterval = checkInterval
     }
