@@ -23,7 +23,7 @@ actor NetworkMonitor {
         
         let totalChecks = network.checks.count
         if totalChecks == 0 {
-            updatedNetwork.status = .unavailable
+            updatedNetwork.status = .notChecked
         } else if availableCount == totalChecks {
             updatedNetwork.status = .available
         } else if availableCount > 0 {

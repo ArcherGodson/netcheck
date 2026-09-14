@@ -4,7 +4,7 @@ import AppKit
 class ConfigWindow: NSWindow {
     init(config: AppConfig, onSave: @escaping (AppConfig) -> Void) {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -14,98 +14,147 @@ class ConfigWindow: NSWindow {
         let contentView = ConfigView(config: config, onSave: onSave, window: self)
         self.contentViewController = NSHostingController(rootView: contentView)
         self.center()
+        self.minSize = NSSize(width: 800, height: 600)
     }
 }
 
 struct ConfigView: View {
-    @State private var config: AppConfig
+    private var config: AppConfig
     private let onSave: (AppConfig) -> Void
-    @State private var editingNetwork: Network?
     let window: NSWindow
     
     init(config: AppConfig, onSave: @escaping (AppConfig) -> Void, window: NSWindow) {
-        self._config = State(initialValue: config)
+        self.config = config
         self.onSave = onSave
         self.window = window
     }
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             // Header
-            Text("Network Configuration")
-                .font(.title)
-                .fontWeight(.bold)
-            
-            // Check interval
             HStack {
-                Text("Check Interval (seconds):")
-                TextField("", value: $config.checkInterval, formatter: NumberFormatter())
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 100)
-                Stepper("", value: $config.checkInterval, in: 5...300, step: 5)
+                Text("Network Configuration")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                
+                Spacer()
+                
+                // Check interval
+                HStack(spacing: 8) {
+                    Text("Interval:")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    TextField("", value: Binding(
+                        get: { config.checkInterval },
+                        set: { newValue in
+                            var newConfig = config
+                            newConfig.checkInterval = newValue
+                            onSave(newConfig)
+                        }
+                    ), formatter: NumberFormatter())
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 60)
+                        .font(.caption)
+                    
+                    Stepper("", value: Binding(
+                        get: { config.checkInterval },
+                        set: { newValue in
+                            var newConfig = config
+                            newConfig.checkInterval = newValue
+                            onSave(newConfig)
+                        }
+                    ), in: 5...300, step: 5)
+                        .labelsHidden()
+                        .controlSize(.small)
+                    
+                    Text("sec")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color(NSColor.controlBackgroundColor))
+                .cornerRadius(6)
             }
             
             Divider()
             
             // Networks list
             List {
-                ForEach($config.networks) { $network in
-                    NetworkRow(network: $network, onEdit: {
-                        editingNetwork = network
-                        showNetworkEditSheet()
+                ForEach(config.networks) { network in
+                    NetworkRow(network: network, onEdit: {
+                        showNetworkEditSheet(network: network)
                     }, onDelete: {
-                        if let index = config.networks.firstIndex(where: { $0.id == network.id }) {
-                            config.networks.remove(at: index)
+                        var newConfig = config
+                        if let index = newConfig.networks.firstIndex(where: { $0.id == network.id }) {
+                            newConfig.networks.remove(at: index)
+                            onSave(newConfig)
                         }
                     })
                 }
             }
-            .frame(height: 250)
+            .frame(height: 400)
             
             // Add button
-            Button(action: {
-                editingNetwork = nil
-                showNetworkEditSheet()
-            }) {
-                Label("Add Network", systemImage: "plus")
+            HStack {
+                Button(action: {
+                    let newNetwork = Network(name: "New Network")
+                    var newConfig = config
+                    newConfig.networks.append(newNetwork)
+                    onSave(newConfig)
+                    showNetworkEditSheet(network: newNetwork)
+                }) {
+                    Label("Add Network", systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                
+                Spacer()
             }
-            .buttonStyle(.borderedProminent)
             
             // Save button
             HStack {
+                Button("Cancel") {
+                    window.close()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                
                 Spacer()
+                
                 Button("Save") {
                     onSave(config)
                     window.close()
                 }
                 .buttonStyle(.borderedProminent)
-                Button("Cancel") {
-                    window.close()
-                }
+                .controlSize(.regular)
+                .disabled(config.networks.isEmpty)
             }
         }
-        .padding()
+        .padding(20)
     }
     
-    private func showNetworkEditSheet() {
+    private func showNetworkEditSheet(network: Network) {
         let editWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 500, height: 600),
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 700),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
         
-        editWindow.title = editingNetwork?.name.isEmpty == false ? "Edit Network" : "Add Network"
+        editWindow.title = network.name.isEmpty ? "Add Network" : "Edit Network"
         let contentView = NetworkEditView(
-            network: editingNetwork ?? Network(name: ""),
-            onSave: { updatedNetwork in
-                if let index = config.networks.firstIndex(where: { $0.id == updatedNetwork.id }) {
-                    config.networks[index] = updatedNetwork
+            network: network,
+            onUpdate: { updatedNetwork in
+                var newConfig = config
+                if let index = newConfig.networks.firstIndex(where: { $0.id == updatedNetwork.id }) {
+                    newConfig.networks[index] = updatedNetwork
                 } else {
-                    config.networks.append(updatedNetwork)
+                    newConfig.networks.append(updatedNetwork)
                 }
+                onSave(newConfig)
                 editWindow.close()
-                editingNetwork = nil
             },
             window: editWindow
         )
@@ -116,255 +165,165 @@ struct ConfigView: View {
 }
 
 struct NetworkRow: View {
-    @Binding var network: Network
+    let network: Network
     let onEdit: () -> Void
     let onDelete: () -> Void
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
-                Text(network.name)
-                    .font(.headline)
-                Text("\(network.checks.count) checks")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(network.name.isEmpty ? "Unnamed Network" : network.name)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                HStack(spacing: 4) {
+                    Text("\(network.checks.count) checks")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    
+                    Circle()
+                        .fill(network.status.colorSwiftUI)
+                        .frame(width: 6, height: 6)
+                }
             }
             
             Spacer()
             
-            // Status indicator
-            Circle()
-                .fill(network.status.colorSwiftUI)
-                .frame(width: 12, height: 12)
-            
-            Button(action: onEdit) {
-                Image(systemName: "pencil")
+            HStack(spacing: 8) {
+                Button(action: onEdit) {
+                    Image(systemName: "pencil")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .foregroundColor(.blue)
+                
+                Button(action: onDelete) {
+                    Image(systemName: "trash")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+                .foregroundColor(.red)
             }
-            .buttonStyle(.borderless)
-            
-            Button(action: onDelete) {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.borderless)
-            .foregroundColor(.red)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(8)
     }
 }
 
 struct NetworkEditView: View {
-    @State private var network: Network
-    private let onSave: (Network) -> Void
+    private var network: Network
+    private let onUpdate: (Network) -> Void
     let window: NSWindow
-    @State private var editingCheck: NetworkCheck?
     
-    init(network: Network, onSave: @escaping (Network) -> Void, window: NSWindow) {
-        self._network = State(initialValue: network)
-        self.onSave = onSave
+    init(network: Network, onUpdate: @escaping (Network) -> Void, window: NSWindow) {
+        self.network = network
+        self.onUpdate = onUpdate
         self.window = window
     }
     
     var body: some View {
-        VStack(spacing: 20) {
-            Text(network.name.isEmpty ? "Add Network" : "Edit Network")
-                .font(.title)
-                .fontWeight(.bold)
-            
-            // Name
-            HStack {
-                Text("Name:")
-                    .frame(width: 100, alignment: .leading)
-                TextField("Network name", text: $network.name)
+        VStack(spacing: 16) {
+            // Network name
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Network Name")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                
+                TextField("Network name", text: Binding(
+                    get: { network.name },
+                    set: { newName in
+                        var updatedNetwork = network
+                        updatedNetwork.name = newName
+                        onUpdate(updatedNetwork)
+                    }
+                ))
                     .textFieldStyle(.roundedBorder)
             }
             
             Divider()
             
-            // Checks list
-            VStack(alignment: .leading) {
-                Text("Checks:")
-                    .font(.headline)
+            // Checks section
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Checks")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        let newCheck = NetworkCheck(type: .icmp, host: "")
+                        var updatedNetwork = network
+                        updatedNetwork.checks.append(newCheck)
+                        onUpdate(updatedNetwork)
+                    }) {
+                        Label("Add Check", systemImage: "plus")
+                            .font(.caption)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
                 
+                // Checks list
                 List {
-                    ForEach($network.checks) { $check in
-                        CheckRow(check: $check, onEdit: {
-                            editingCheck = check
-                            showCheckEditSheet()
-                        }, onDelete: {
-                            if let index = network.checks.firstIndex(where: { $0.id == check.id }) {
-                                network.checks.remove(at: index)
+                    ForEach(network.checks) { check in
+                        CheckRow(check: check, onDelete: {
+                            var updatedNetwork = network
+                            if let index = updatedNetwork.checks.firstIndex(where: { $0.id == check.id }) {
+                                updatedNetwork.checks.remove(at: index)
+                                onUpdate(updatedNetwork)
                             }
                         })
                     }
                 }
-                .frame(height: 200)
+                .frame(height: 300)
             }
             
-            // Add check button
-            Button(action: {
-                editingCheck = nil
-                showCheckEditSheet()
-            }) {
-                Label("Add Check", systemImage: "plus")
-            }
-            .buttonStyle(.borderedProminent)
-            
-            Divider()
-            
+            // Buttons
             HStack {
-                Button("Cancel") {
+                Button("Close") {
                     window.close()
                 }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                
                 Spacer()
-                Button("Save") {
-                    onSave(network)
-                    window.close()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(network.name.isEmpty || network.checks.isEmpty)
             }
         }
-        .padding()
-        .frame(width: 500, height: 600)
-    }
-    
-    private func showCheckEditSheet() {
-        let editWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 400, height: 500),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
-        
-        editWindow.title = editingCheck != nil ? "Edit Check" : "Add Check"
-        let contentView = CheckEditView(
-            check: editingCheck ?? NetworkCheck(type: .icmp, host: ""),
-            onSave: { updatedCheck in
-                if let index = network.checks.firstIndex(where: { $0.id == updatedCheck.id }) {
-                    network.checks[index] = updatedCheck
-                } else {
-                    network.checks.append(updatedCheck)
-                }
-                editWindow.close()
-                editingCheck = nil
-            },
-            window: editWindow
-        )
-        editWindow.contentViewController = NSHostingController(rootView: contentView)
-        editWindow.center()
-        editWindow.makeKeyAndOrderFront(nil)
+        .padding(20)
     }
 }
 
 struct CheckRow: View {
-    @Binding var check: NetworkCheck
-    let onEdit: () -> Void
+    let check: NetworkCheck
     let onDelete: () -> Void
     
     var body: some View {
-        HStack {
-            VStack(alignment: .leading) {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(check.description)
                     .font(.caption)
+                    .fontWeight(.medium)
+                
                 Circle()
                     .fill(check.status.colorSwiftUI)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 6, height: 6)
             }
             
             Spacer()
             
-            Button(action: onEdit) {
-                Image(systemName: "pencil")
-            }
-            .buttonStyle(.borderless)
-            
             Button(action: onDelete) {
                 Image(systemName: "trash")
+                    .font(.caption2)
             }
             .buttonStyle(.borderless)
             .foregroundColor(.red)
         }
-        .padding(.vertical, 2)
-    }
-}
-
-struct CheckEditView: View {
-    @State private var check: NetworkCheck
-    private let onSave: (NetworkCheck) -> Void
-    let window: NSWindow
-    
-    init(check: NetworkCheck, onSave: @escaping (NetworkCheck) -> Void, window: NSWindow) {
-        self._check = State(initialValue: check)
-        self.onSave = onSave
-        self.window = window
-    }
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            Text("Edit Check")
-                .font(.title)
-                .fontWeight(.bold)
-            
-            // Type
-            VStack(alignment: .leading) {
-                Text("Type:")
-                    .font(.headline)
-                Picker("Type", selection: $check.type) {
-                    ForEach(CheckType.allCases, id: \.self) { type in
-                        Text(type.rawValue).tag(type)
-                    }
-                }
-                .pickerStyle(.segmented)
-            }
-            
-            // Host
-            HStack {
-                Text("Host:")
-                    .frame(width: 100, alignment: .leading)
-                TextField("hostname or IP", text: $check.host)
-                    .textFieldStyle(.roundedBorder)
-            }
-            
-            // Port (for TCP, HTTP)
-            if check.type == .tcp || check.type == .http {
-                HStack {
-                    Text("Port:")
-                        .frame(width: 100, alignment: .leading)
-                    TextField("Port number", value: $check.port, formatter: NumberFormatter())
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 100)
-                }
-            }
-            
-            // DNS Server (for DNS)
-            if check.type == .dns {
-                HStack {
-                    Text("DNS Server:")
-                        .frame(width: 100, alignment: .leading)
-                    TextField("DNS server (optional)", text: Binding(
-                        get: { check.dnsServer ?? "" },
-                        set: { check.dnsServer = $0.isEmpty ? nil : $0 }
-                    ))
-                    .textFieldStyle(.roundedBorder)
-                }
-            }
-            
-            Divider()
-            
-            HStack {
-                Button("Cancel") {
-                    window.close()
-                }
-                Spacer()
-                Button("Save") {
-                    onSave(check)
-                    window.close()
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(check.host.isEmpty)
-            }
-        }
-        .padding()
-        .frame(width: 400, height: 500)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(6)
     }
 }

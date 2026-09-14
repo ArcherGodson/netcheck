@@ -138,6 +138,8 @@ class TrayIconManager: ObservableObject {
             return "Partially Available"
         case .unavailable:
             return "Unavailable"
+        case .notChecked:
+            return "Not Checked"
         }
     }
     
@@ -201,7 +203,16 @@ class MenuManager {
         
         // Check results
         for check in network.checks {
-            let status = check.status == .available ? "✓" : "✗"
+            let status: String
+            switch check.status {
+            case .available:
+                status = "✓"
+            case .unavailable:
+                status = "✗"
+            case .notChecked:
+                status = "○"
+            }
+            
             let checkItem = NSMenuItem(title: "\(status) \(check.description)", action: nil, keyEquivalent: "")
             checkItem.isEnabled = false
             menu.addItem(checkItem)
@@ -237,6 +248,8 @@ class MenuManager {
             return "Partially Available"
         case .unavailable:
             return "Unavailable"
+        case .notChecked:
+            return "Not Checked"
         }
     }
     

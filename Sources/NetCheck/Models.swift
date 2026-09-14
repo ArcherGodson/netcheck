@@ -14,6 +14,7 @@ enum CheckType: String, CaseIterable, Codable {
 enum CheckStatus: Equatable, Codable {
     case available
     case unavailable
+    case notChecked
     
     var color: NSColor {
         switch self {
@@ -21,6 +22,8 @@ enum CheckStatus: Equatable, Codable {
             return .systemGreen
         case .unavailable:
             return .systemRed
+        case .notChecked:
+            return .systemGray
         }
     }
     
@@ -30,6 +33,8 @@ enum CheckStatus: Equatable, Codable {
             return .green
         case .unavailable:
             return .red
+        case .notChecked:
+            return .gray
         }
     }
 }
@@ -49,7 +54,7 @@ struct NetworkCheck: Codable, Identifiable {
         self.host = host
         self.port = port
         self.dnsServer = dnsServer
-        self.status = .unavailable
+        self.status = .notChecked
         self.lastCheck = nil
     }
     
@@ -84,6 +89,7 @@ enum NetworkStatus: Equatable, Codable {
     case available
     case partiallyAvailable
     case unavailable
+    case notChecked
     
     var color: NSColor {
         switch self {
@@ -93,6 +99,8 @@ enum NetworkStatus: Equatable, Codable {
             return .systemYellow
         case .unavailable:
             return .systemRed
+        case .notChecked:
+            return .systemGray
         }
     }
     
@@ -104,6 +112,8 @@ enum NetworkStatus: Equatable, Codable {
             return .yellow
         case .unavailable:
             return .red
+        case .notChecked:
+            return .gray
         }
     }
 }
@@ -119,7 +129,7 @@ struct Network: Codable, Identifiable {
         self.id = UUID()
         self.name = name
         self.checks = checks
-        self.status = .unavailable
+        self.status = .notChecked
         self.lastCheck = nil
     }
     
