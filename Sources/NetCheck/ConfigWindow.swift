@@ -13,7 +13,11 @@ class ConfigWindow: NSWindow {
         
         self.title = "NetCheck Configuration"
         let contentView = ConfigView(config: config, onSave: onSave, window: self)
-        self.contentViewController = NSHostingController(rootView: contentView)
+        let hostingController = NSHostingController(rootView: contentView)
+        self.contentViewController = hostingController
+        
+        // Force the window to have the correct size
+        self.setContentSize(NSSize(width: 1200, height: 900))
         self.center()
         self.minSize = NSSize(width: 1000, height: 800)
         
@@ -74,6 +78,7 @@ struct ConfigView: View {
                 .cornerRadius(8)
             }
             .padding(20)
+            .frame(maxWidth: .infinity)
             
             Divider()
             
@@ -95,7 +100,9 @@ struct ConfigView: View {
                     }
                 }
                 .padding(20)
+                .frame(maxWidth: .infinity)
             }
+            .frame(maxWidth: .infinity)
             
             Divider()
             
@@ -134,7 +141,9 @@ struct ConfigView: View {
                 .disabled(config.networks.isEmpty)
             }
             .padding(20)
+            .frame(maxWidth: .infinity)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
             DiagnosticLogger.shared.log("ConfigView appeared with window size: \(window.frame.size)")
         }
@@ -166,11 +175,15 @@ struct ConfigView: View {
             },
             window: editWindow
         )
-        editWindow.contentViewController = NSHostingController(rootView: contentView)
+        let hostingController = NSHostingController(rootView: contentView)
+        editWindow.contentViewController = hostingController
+        
+        // Force the window to have the correct size
+        editWindow.setContentSize(NSSize(width: 900, height: 900))
         editWindow.center()
         editWindow.makeKeyAndOrderFront(nil)
         
-        DiagnosticLogger.shared.log("Edit window created and shown")
+        DiagnosticLogger.shared.log("Edit window created and shown with size: \(editWindow.frame.size)")
     }
 }
 
@@ -260,6 +273,7 @@ struct NetworkEditView: View {
                     .textFieldStyle(.roundedBorder)
                     .font(.body)
             }
+            .frame(maxWidth: .infinity)
             
             Divider()
             
@@ -285,6 +299,7 @@ struct NetworkEditView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.regular)
                 }
+                .frame(maxWidth: .infinity)
                 
                 // Checks list
                 ScrollView {
@@ -303,7 +318,9 @@ struct NetworkEditView: View {
                     .padding(4)
                 }
                 .frame(height: 400)
+                .frame(maxWidth: .infinity)
             }
+            .frame(maxWidth: .infinity)
             
             Divider()
             
@@ -318,10 +335,12 @@ struct NetworkEditView: View {
                 
                 Spacer()
             }
+            .frame(maxWidth: .infinity)
         }
         .padding(24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            DiagnosticLogger.shared.log("NetworkEditView appeared with \(network.checks.count) checks")
+            DiagnosticLogger.shared.log("NetworkEditView appeared with \(network.checks.count) checks, window size: \(window.frame.size)")
         }
     }
 }
