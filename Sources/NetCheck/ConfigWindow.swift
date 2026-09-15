@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import os.log
 
 class ConfigWindow: NSWindow {
     init(config: AppConfig, onSave: @escaping (AppConfig) -> Void) {
@@ -15,6 +16,8 @@ class ConfigWindow: NSWindow {
         self.contentViewController = NSHostingController(rootView: contentView)
         self.center()
         self.minSize = NSSize(width: 1000, height: 800)
+        
+        DiagnosticLogger.shared.log("ConfigWindow initialized with size: \(self.frame.size)")
     }
 }
 
@@ -27,6 +30,7 @@ struct ConfigView: View {
         self.config = config
         self.onSave = onSave
         self.window = window
+        DiagnosticLogger.shared.log("ConfigView initialized with \(config.networks.count) networks")
     }
     
     var body: some View {
@@ -52,6 +56,7 @@ struct ConfigView: View {
                     Stepper("", value: Binding(
                         get: { config.checkInterval },
                         set: { newValue in
+                            DiagnosticLogger.shared.log("Interval changed to: \(newValue)")
                             var newConfig = config
                             newConfig.checkInterval = newValue
                             onSave(newConfig)
@@ -77,8 +82,10 @@ struct ConfigView: View {
                 VStack(spacing: 12) {
                     ForEach(config.networks) { network in
                         NetworkRow(network: network, onEdit: {
+                            DiagnosticLogger.shared.log("Edit button pressed for network: \(network.name)")
                             showNetworkEditSheet(network: network)
                         }, onDelete: {
+                            DiagnosticLogger.shared.log("Delete button pressed for network: \(network.name)")
                             var newConfig = config
                             if let index = newConfig.networks.firstIndex(where: { $0.id == network.id }) {
                                 newConfig.networks.remove(at: index)
@@ -95,6 +102,7 @@ struct ConfigView: View {
             // Bottom buttons
             HStack(spacing: 16) {
                 Button(action: {
+                    DiagnosticLogger.shared.log("Add Network button pressed")
                     let newNetwork = Network(name: "New Network")
                     var newConfig = config
                     newConfig.networks.append(newNetwork)
@@ -110,12 +118,14 @@ struct ConfigView: View {
                 Spacer()
                 
                 Button("Cancel") {
+                    DiagnosticLogger.shared.log("Cancel button pressed")
                     window.close()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 
                 Button("Save") {
+                    DiagnosticLogger.shared.log("Save button pressed")
                     onSave(config)
                     window.close()
                 }
@@ -125,9 +135,14 @@ struct ConfigView: View {
             }
             .padding(20)
         }
+        .onAppear {
+            DiagnosticLogger.shared.log("ConfigView appeared with window size: \(window.frame.size)")
+        }
     }
     
     private func showNetworkEditSheet(network: Network) {
+        DiagnosticLogger.shared.log("Opening edit sheet for network: \(network.name)")
+        
         let editWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 900),
             styleMask: [.titled, .closable],
@@ -139,6 +154,7 @@ struct ConfigView: View {
         let contentView = NetworkEditView(
             network: network,
             onUpdate: { updatedNetwork in
+                DiagnosticLogger.shared.log("Network updated: \(updatedNetwork.name)")
                 var newConfig = config
                 if let index = newConfig.networks.firstIndex(where: { $0.id == updatedNetwork.id }) {
                     newConfig.networks[index] = updatedNetwork
@@ -153,6 +169,8 @@ struct ConfigView: View {
         editWindow.contentViewController = NSHostingController(rootView: contentView)
         editWindow.center()
         editWindow.makeKeyAndOrderFront(nil)
+        
+        DiagnosticLogger.shared.log("Edit window created and shown")
     }
 }
 
@@ -182,14 +200,20 @@ struct NetworkRow: View {
             Spacer()
             
             HStack(spacing: 12) {
-                Button(action: onEdit) {
+                Button(action: {
+                    DiagnosticLogger.shared.log("NetworkRow Edit button pressed for: \(network.name)")
+                    onEdit()
+                }) {
                     Label("Edit", systemImage: "pencil")
                         .font(.body)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
                 
-                Button(action: onDelete) {
+                Button(action: {
+                    DiagnosticLogger.shared.log("NetworkRow Delete button pressed for: \(network.name)")
+                    onDelete()
+                }) {
                     Label("Delete", systemImage: "trash")
                         .font(.body)
                 }
@@ -213,6 +237,7 @@ struct NetworkEditView: View {
         self.network = network
         self.onUpdate = onUpdate
         self.window = window
+        DiagnosticLogger.shared.log("NetworkEditView initialized for: \(network.name)")
     }
     
     var body: some View {
@@ -226,6 +251,7 @@ struct NetworkEditView: View {
                 TextField("Enter network name", text: Binding(
                     get: { network.name },
                     set: { newName in
+                        DiagnosticLogger.shared.log("Network name changed to: \(newName)")
                         var updatedNetwork = network
                         updatedNetwork.name = newName
                         onUpdate(updatedNetwork)
@@ -247,6 +273,7 @@ struct NetworkEditView: View {
                     Spacer()
                     
                     Button(action: {
+                        DiagnosticLogger.shared.log("Add Check button pressed")
                         var updatedNetwork = network
                         let newCheck = NetworkCheck(type: .icmp, host: "")
                         updatedNetwork.checks.append(newCheck)
@@ -264,6 +291,7 @@ struct NetworkEditView: View {
                     VStack(spacing: 12) {
                         ForEach(network.checks) { check in
                             CheckRow(check: check, onDelete: {
+                                DiagnosticLogger.shared.log("Remove Check button pressed")
                                 var updatedNetwork = network
                                 if let index = updatedNetwork.checks.firstIndex(where: { $0.id == check.id }) {
                                     updatedNetwork.checks.remove(at: index)
@@ -282,6 +310,7 @@ struct NetworkEditView: View {
             // Buttons
             HStack {
                 Button("Close") {
+                    DiagnosticLogger.shared.log("Close button pressed in edit view")
                     window.close()
                 }
                 .buttonStyle(.bordered)
@@ -291,6 +320,9 @@ struct NetworkEditView: View {
             }
         }
         .padding(24)
+        .onAppear {
+            DiagnosticLogger.shared.log("NetworkEditView appeared with \(network.checks.count) checks")
+        }
     }
 }
 
@@ -318,7 +350,10 @@ struct CheckRow: View {
             
             Spacer()
             
-            Button(action: onDelete) {
+            Button(action: {
+                DiagnosticLogger.shared.log("CheckRow Remove button pressed")
+                onDelete()
+            }) {
                 Label("Remove", systemImage: "trash")
                     .font(.body)
             }
@@ -329,5 +364,41 @@ struct CheckRow: View {
         .padding(12)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(8)
+    }
+}
+
+// Diagnostic logger for debugging UI issues
+@MainActor
+class DiagnosticLogger {
+    static let shared = DiagnosticLogger()
+    private let fileURL: URL
+    
+    private init() {
+        let paths = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)
+        let desktopURL = paths[0]
+        fileURL = desktopURL.appendingPathComponent("netcheck_ui_debug.log")
+        
+        // Clear previous log
+        try? "".write(to: fileURL, atomically: true, encoding: .utf8)
+        log("DiagnosticLogger initialized")
+    }
+    
+    func log(_ message: String) {
+        let timestamp = ISO8601DateFormatter().string(from: Date())
+        let logMessage = "[\(timestamp)] \(message)\n"
+        
+        // Also print to console for immediate feedback
+        print("NetCheck UI: \(message)")
+        
+        // Log to file
+        if let data = logMessage.data(using: .utf8) {
+            if let handle = try? FileHandle(forWritingTo: fileURL) {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                handle.closeFile()
+            } else {
+                try? logMessage.write(to: fileURL, atomically: true, encoding: .utf8)
+            }
+        }
     }
 }
