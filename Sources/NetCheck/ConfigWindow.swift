@@ -4,7 +4,7 @@ import AppKit
 class ConfigWindow: NSWindow {
     init(config: AppConfig, onSave: @escaping (AppConfig) -> Void) {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 700),
+            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 750),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -14,7 +14,7 @@ class ConfigWindow: NSWindow {
         let contentView = ConfigView(config: config, onSave: onSave, window: self)
         self.contentViewController = NSHostingController(rootView: contentView)
         self.center()
-        self.minSize = NSSize(width: 800, height: 600)
+        self.minSize = NSSize(width: 900, height: 650)
     }
 }
 
@@ -30,19 +30,19 @@ struct ConfigView: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 0) {
             // Header
             HStack {
                 Text("Network Configuration")
-                    .font(.title2)
+                    .font(.title)
                     .fontWeight(.bold)
                 
                 Spacer()
                 
                 // Check interval
-                HStack(spacing: 8) {
-                    Text("Interval:")
-                        .font(.caption)
+                HStack(spacing: 12) {
+                    Text("Check Interval:")
+                        .font(.body)
                         .foregroundColor(.secondary)
                     
                     TextField("", value: Binding(
@@ -54,8 +54,8 @@ struct ConfigView: View {
                         }
                     ), formatter: NumberFormatter())
                         .textFieldStyle(.roundedBorder)
-                        .frame(width: 60)
-                        .font(.caption)
+                        .frame(width: 70)
+                        .font(.body)
                     
                     Stepper("", value: Binding(
                         get: { config.checkInterval },
@@ -66,38 +66,42 @@ struct ConfigView: View {
                         }
                     ), in: 5...300, step: 5)
                         .labelsHidden()
-                        .controlSize(.small)
                     
-                    Text("sec")
-                        .font(.caption)
+                    Text("seconds")
+                        .font(.body)
                         .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
                 .background(Color(NSColor.controlBackgroundColor))
-                .cornerRadius(6)
+                .cornerRadius(8)
             }
+            .padding(20)
             
             Divider()
             
             // Networks list
-            List {
-                ForEach(config.networks) { network in
-                    NetworkRow(network: network, onEdit: {
-                        showNetworkEditSheet(network: network)
-                    }, onDelete: {
-                        var newConfig = config
-                        if let index = newConfig.networks.firstIndex(where: { $0.id == network.id }) {
-                            newConfig.networks.remove(at: index)
-                            onSave(newConfig)
-                        }
-                    })
+            ScrollView {
+                VStack(spacing: 12) {
+                    ForEach(config.networks) { network in
+                        NetworkRow(network: network, onEdit: {
+                            showNetworkEditSheet(network: network)
+                        }, onDelete: {
+                            var newConfig = config
+                            if let index = newConfig.networks.firstIndex(where: { $0.id == network.id }) {
+                                newConfig.networks.remove(at: index)
+                                onSave(newConfig)
+                            }
+                        })
+                    }
                 }
+                .padding(20)
             }
-            .frame(height: 400)
             
-            // Add button
-            HStack {
+            Divider()
+            
+            // Bottom buttons
+            HStack(spacing: 16) {
                 Button(action: {
                     let newNetwork = Network(name: "New Network")
                     var newConfig = config
@@ -106,38 +110,34 @@ struct ConfigView: View {
                     showNetworkEditSheet(network: newNetwork)
                 }) {
                     Label("Add Network", systemImage: "plus")
+                        .font(.body)
                 }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
+                .controlSize(.large)
                 
                 Spacer()
-            }
-            
-            // Save button
-            HStack {
+                
                 Button("Cancel") {
                     window.close()
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.regular)
-                
-                Spacer()
+                .controlSize(.large)
                 
                 Button("Save") {
                     onSave(config)
                     window.close()
                 }
                 .buttonStyle(.borderedProminent)
-                .controlSize(.regular)
+                .controlSize(.large)
                 .disabled(config.networks.isEmpty)
             }
+            .padding(20)
         }
-        .padding(20)
     }
     
     private func showNetworkEditSheet(network: Network) {
         let editWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 600, height: 700),
+            contentRect: NSRect(x: 0, y: 0, width: 700, height: 800),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -170,45 +170,45 @@ struct NetworkRow: View {
     let onDelete: () -> Void
     
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 8) {
                 Text(network.name.isEmpty ? "Unnamed Network" : network.name)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
+                    .font(.title3)
+                    .fontWeight(.semibold)
                 
-                HStack(spacing: 4) {
+                HStack(spacing: 8) {
                     Text("\(network.checks.count) checks")
-                        .font(.caption2)
+                        .font(.subheadline)
                         .foregroundColor(.secondary)
                     
                     Circle()
                         .fill(network.status.colorSwiftUI)
-                        .frame(width: 6, height: 6)
+                        .frame(width: 10, height: 10)
                 }
             }
             
             Spacer()
             
-            HStack(spacing: 8) {
+            HStack(spacing: 12) {
                 Button(action: onEdit) {
-                    Image(systemName: "pencil")
-                        .font(.caption)
+                    Label("Edit", systemImage: "pencil")
+                        .font(.body)
                 }
-                .buttonStyle(.borderless)
-                .foregroundColor(.blue)
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
                 
                 Button(action: onDelete) {
-                    Image(systemName: "trash")
-                        .font(.caption)
+                    Label("Delete", systemImage: "trash")
+                        .font(.body)
                 }
-                .buttonStyle(.borderless)
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
                 .foregroundColor(.red)
             }
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 12)
+        .padding(16)
         .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(8)
+        .cornerRadius(12)
     }
 }
 
@@ -224,14 +224,14 @@ struct NetworkEditView: View {
     }
     
     var body: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 20) {
             // Network name
             VStack(alignment: .leading, spacing: 8) {
                 Text("Network Name")
-                    .font(.caption)
+                    .font(.headline)
                     .foregroundColor(.secondary)
                 
-                TextField("Network name", text: Binding(
+                TextField("Enter network name", text: Binding(
                     get: { network.name },
                     set: { newName in
                         var updatedNetwork = network
@@ -240,16 +240,17 @@ struct NetworkEditView: View {
                     }
                 ))
                     .textFieldStyle(.roundedBorder)
+                    .font(.body)
             }
             
             Divider()
             
             // Checks section
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 16) {
                 HStack {
-                    Text("Checks")
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                    Text("Network Checks")
+                        .font(.title2)
+                        .fontWeight(.bold)
                     
                     Spacer()
                     
@@ -260,26 +261,31 @@ struct NetworkEditView: View {
                         onUpdate(updatedNetwork)
                     }) {
                         Label("Add Check", systemImage: "plus")
-                            .font(.caption)
+                            .font(.body)
                     }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
+                    .controlSize(.regular)
                 }
                 
                 // Checks list
-                List {
-                    ForEach(network.checks) { check in
-                        CheckRow(check: check, onDelete: {
-                            var updatedNetwork = network
-                            if let index = updatedNetwork.checks.firstIndex(where: { $0.id == check.id }) {
-                                updatedNetwork.checks.remove(at: index)
-                                onUpdate(updatedNetwork)
-                            }
-                        })
+                ScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(network.checks) { check in
+                            CheckRow(check: check, onDelete: {
+                                var updatedNetwork = network
+                                if let index = updatedNetwork.checks.firstIndex(where: { $0.id == check.id }) {
+                                    updatedNetwork.checks.remove(at: index)
+                                    onUpdate(updatedNetwork)
+                                }
+                            })
+                        }
                     }
+                    .padding(4)
                 }
-                .frame(height: 300)
+                .frame(height: 400)
             }
+            
+            Divider()
             
             // Buttons
             HStack {
@@ -287,12 +293,12 @@ struct NetworkEditView: View {
                     window.close()
                 }
                 .buttonStyle(.bordered)
-                .controlSize(.regular)
+                .controlSize(.large)
                 
                 Spacer()
             }
         }
-        .padding(20)
+        .padding(24)
     }
 }
 
@@ -301,29 +307,35 @@ struct CheckRow: View {
     let onDelete: () -> Void
     
     var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 16) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(check.description)
-                    .font(.caption)
+                    .font(.body)
                     .fontWeight(.medium)
                 
-                Circle()
-                    .fill(check.status.colorSwiftUI)
-                    .frame(width: 6, height: 6)
+                HStack(spacing: 6) {
+                    Text(check.type.rawValue)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Circle()
+                        .fill(check.status.colorSwiftUI)
+                        .frame(width: 8, height: 8)
+                }
             }
             
             Spacer()
             
             Button(action: onDelete) {
-                Image(systemName: "trash")
-                    .font(.caption2)
+                Label("Remove", systemImage: "trash")
+                    .font(.body)
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.bordered)
+            .controlSize(.regular)
             .foregroundColor(.red)
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 12)
+        .padding(12)
         .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(6)
+        .cornerRadius(8)
     }
 }
