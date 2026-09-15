@@ -4,7 +4,7 @@ import AppKit
 class ConfigWindow: NSWindow {
     init(config: AppConfig, onSave: @escaping (AppConfig) -> Void) {
         super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 1000, height: 750),
+            contentRect: NSRect(x: 0, y: 0, width: 1200, height: 900),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
@@ -14,7 +14,7 @@ class ConfigWindow: NSWindow {
         let contentView = ConfigView(config: config, onSave: onSave, window: self)
         self.contentViewController = NSHostingController(rootView: contentView)
         self.center()
-        self.minSize = NSSize(width: 900, height: 650)
+        self.minSize = NSSize(width: 1000, height: 800)
     }
 }
 
@@ -45,17 +45,9 @@ struct ConfigView: View {
                         .font(.body)
                         .foregroundColor(.secondary)
                     
-                    TextField("", value: Binding(
-                        get: { config.checkInterval },
-                        set: { newValue in
-                            var newConfig = config
-                            newConfig.checkInterval = newValue
-                            onSave(newConfig)
-                        }
-                    ), formatter: NumberFormatter())
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 70)
+                    Text("\(Int(config.checkInterval))")
                         .font(.body)
+                        .fontWeight(.medium)
                     
                     Stepper("", value: Binding(
                         get: { config.checkInterval },
@@ -137,7 +129,7 @@ struct ConfigView: View {
     
     private func showNetworkEditSheet(network: Network) {
         let editWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 700, height: 800),
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 900),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -255,8 +247,8 @@ struct NetworkEditView: View {
                     Spacer()
                     
                     Button(action: {
-                        let newCheck = NetworkCheck(type: .icmp, host: "")
                         var updatedNetwork = network
+                        let newCheck = NetworkCheck(type: .icmp, host: "")
                         updatedNetwork.checks.append(newCheck)
                         onUpdate(updatedNetwork)
                     }) {
