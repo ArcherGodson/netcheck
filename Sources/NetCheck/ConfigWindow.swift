@@ -173,7 +173,7 @@ struct ConfigView: View {
                     newConfig.networks.append(updatedNetwork)
                 }
                 onSave(newConfig)
-                editWindow.close()
+                // Don't close the window - let the user close it manually
             },
             window: editWindow
         )
@@ -269,7 +269,7 @@ struct NetworkEditView: View {
                         DiagnosticLogger.shared.log("Network name changed to: \(newName)")
                         var updatedNetwork = network
                         updatedNetwork.name = newName
-                        // Don't call onUpdate - only update locally
+                        onUpdate(updatedNetwork)
                     }
                 ))
                     .textFieldStyle(.roundedBorder)
@@ -293,7 +293,7 @@ struct NetworkEditView: View {
                         var updatedNetwork = network
                         let newCheck = NetworkCheck(type: .icmp, host: "")
                         updatedNetwork.checks.append(newCheck)
-                        // Don't call onUpdate - only update locally
+                        onUpdate(updatedNetwork)
                     }) {
                         Label("Add Check", systemImage: "plus")
                             .font(.body)
@@ -312,7 +312,7 @@ struct NetworkEditView: View {
                                 var updatedNetwork = network
                                 if let index = updatedNetwork.checks.firstIndex(where: { $0.id == check.id }) {
                                     updatedNetwork.checks.remove(at: index)
-                                    // Don't call onUpdate - only update locally
+                                    onUpdate(updatedNetwork)
                                 }
                             })
                         }
@@ -336,18 +336,6 @@ struct NetworkEditView: View {
                 .controlSize(.large)
                 
                 Spacer()
-                
-                Button("Save") {
-                    DiagnosticLogger.shared.log("Save button pressed in edit view")
-                    // Call onUpdate only when Save is pressed
-                    var updatedNetwork = network
-                    updatedNetwork.name = network.name
-                    updatedNetwork.checks = network.checks
-                    onUpdate(updatedNetwork)
-                    window.close()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
             }
             .frame(maxWidth: .infinity)
         }
