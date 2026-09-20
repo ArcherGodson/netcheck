@@ -161,6 +161,7 @@ struct ConfigView: View {
         
         editWindow.title = network.name.isEmpty ? "Add Network" : "Edit Network"
         editWindow.level = .floating // Make it float above other windows
+        editWindow.hidesOnDeactivate = false // Don't hide when deactivated
         
         let contentView = NetworkEditView(
             network: network,
@@ -173,10 +174,9 @@ struct ConfigView: View {
                     newConfig.networks.append(updatedNetwork)
                 }
                 onSave(newConfig)
-                window.endSheet(editWindow)
+                editWindow.close()
             },
-            window: editWindow,
-            parentWindow: window
+            window: editWindow
         )
         let hostingController = NSHostingController(rootView: contentView)
         editWindow.contentViewController = hostingController
@@ -184,13 +184,9 @@ struct ConfigView: View {
         // Force the window to have the correct size
         editWindow.setContentSize(NSSize(width: 900, height: 900))
         editWindow.center()
+        editWindow.makeKeyAndOrderFront(nil)
         
-        // Run the window as a modal sheet
-        window.beginSheet(editWindow) { response in
-            DiagnosticLogger.shared.log("Edit sheet closed with response: \(response)")
-        }
-        
-        DiagnosticLogger.shared.log("Edit sheet opened as modal")
+        DiagnosticLogger.shared.log("Edit window created and shown with size: \(editWindow.frame.size)")
     }
 }
 
@@ -252,13 +248,11 @@ struct NetworkEditView: View {
     private var network: Network
     private let onUpdate: (Network) -> Void
     let window: NSWindow
-    let parentWindow: NSWindow
     
-    init(network: Network, onUpdate: @escaping (Network) -> Void, window: NSWindow, parentWindow: NSWindow) {
+    init(network: Network, onUpdate: @escaping (Network) -> Void, window: NSWindow) {
         self.network = network
         self.onUpdate = onUpdate
         self.window = window
-        self.parentWindow = parentWindow
         DiagnosticLogger.shared.log("NetworkEditView initialized for: \(network.name)")
     }
     
@@ -276,7 +270,7 @@ struct NetworkEditView: View {
                         DiagnosticLogger.shared.log("Network name changed to: \(newName)")
                         var updatedNetwork = network
                         updatedNetwork.name = newName
-                        onUpdate(updatedNetwork)
+                        // Don't call onUpdate here - only save on close
                     }
                 ))
                     .textFieldStyle(.roundedBorder)
@@ -300,7 +294,7 @@ struct NetworkEditView: View {
                         var updatedNetwork = network
                         let newCheck = NetworkCheck(type: .icmp, host: "")
                         updatedNetwork.checks.append(newCheck)
-                        onUpdate(updatedNetwork)
+                        // Don't call onUpdate here - only save on close
                     }) {
                         Label("Add Check", systemImage: "plus")
                             .font(.body)
@@ -319,7 +313,7 @@ struct NetworkEditView: View {
                                 var updatedNetwork = network
                                 if let index = updatedNetwork.checks.firstIndex(where: { $0.id == check.id }) {
                                     updatedNetwork.checks.remove(at: index)
-                                    onUpdate(updatedNetwork)
+                                    // Don't call onUpdate here - only save on close
                                 }
                             })
                         }
@@ -335,14 +329,22 @@ struct NetworkEditView: View {
             
             // Buttons
             HStack {
-                Button("Close") {
-                    DiagnosticLogger.shared.log("Close button pressed in edit view")
-                    parentWindow.endSheet(window)
+                Button("Cancel") {
+                    DiagnosticLogger.shared.log("Cancel button pressed in edit view")
+                    window.close()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 
                 Spacer()
+                
+                Button("Save") {
+                    DiagnosticLogger.shared.log("Save button pressed in edit view")
+                    onUpdate(network)
+                    window.close()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
             .frame(maxWidth: .infinity)
         }
