@@ -173,7 +173,6 @@ struct ConfigView: View {
                     newConfig.networks.append(updatedNetwork)
                 }
                 onSave(newConfig)
-                // Don't close the window - let the user close it manually
             },
             window: editWindow
         )
@@ -244,12 +243,12 @@ struct NetworkRow: View {
 }
 
 struct NetworkEditView: View {
-    private var network: Network
+    @ObservedObject private var viewModel: NetworkEditViewModel
     private let onUpdate: (Network) -> Void
     let window: NSWindow
     
     init(network: Network, onUpdate: @escaping (Network) -> Void, window: NSWindow) {
-        self.network = network
+        self.viewModel = NetworkEditViewModel(network: network)
         self.onUpdate = onUpdate
         self.window = window
         DiagnosticLogger.shared.log("NetworkEditView initialized for: \(network.name)")
@@ -263,15 +262,7 @@ struct NetworkEditView: View {
                     .font(.headline)
                     .foregroundColor(.secondary)
                 
-                TextField("Enter network name", text: Binding(
-                    get: { network.name },
-                    set: { newName in
-                        DiagnosticLogger.shared.log("Network name changed to: \(newName)")
-                        var updatedNetwork = network
-                        updatedNetwork.name = newName
-                        onUpdate(updatedNetwork)
-                    }
-                ))
+                TextField("Enter network name", text: $viewModel.network.name)
                     .textFieldStyle(.roundedBorder)
                     .font(.body)
             }
@@ -290,10 +281,9 @@ struct NetworkEditView: View {
                     
                     Button(action: {
                         DiagnosticLogger.shared.log("Add Check button pressed")
-                        var updatedNetwork = network
                         let newCheck = NetworkCheck(type: .icmp, host: "")
-                        updatedNetwork.checks.append(newCheck)
-                        onUpdate(updatedNetwork)
+                        viewModel.network.checks.append(newCheck)
+                        onUpdate(viewModel.network)
                     }) {
                         Label("Add Check", systemImage: "plus")
                             .font(.body)
@@ -306,13 +296,12 @@ struct NetworkEditView: View {
                 // Checks list
                 ScrollView {
                     VStack(spacing: 12) {
-                        ForEach(network.checks) { check in
-                            CheckRow(check: check, onDelete: {
+                        ForEach($viewModel.network.checks) { $check in
+                            CheckRow(check: $check, onDelete: {
                                 DiagnosticLogger.shared.log("Remove Check button pressed")
-                                var updatedNetwork = network
-                                if let index = updatedNetwork.checks.firstIndex(where: { $0.id == check.id }) {
-                                    updatedNetwork.checks.remove(at: index)
-                                    onUpdate(updatedNetwork)
+                                if let index = viewModel.network.checks.firstIndex(where: { $0.id == check.id }) {
+                                    viewModel.network.checks.remove(at: index)
+                                    onUpdate(viewModel.network)
                                 }
                             })
                         }
@@ -342,13 +331,21 @@ struct NetworkEditView: View {
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .onAppear {
-            DiagnosticLogger.shared.log("NetworkEditView appeared with \(network.checks.count) checks, window size: \(window.frame.size)")
+            DiagnosticLogger.shared.log("NetworkEditView appeared with \(viewModel.network.checks.count) checks, window size: \(window.frame.size)")
         }
     }
 }
 
+class NetworkEditViewModel: ObservableObject {
+    @Published var network: Network
+    
+    init(network: Network) {
+        self.network = network
+    }
+}
+
 struct CheckRow: View {
-    let check: NetworkCheck
+    @Binding var check: NetworkCheck
     let onDelete: () -> Void
     
     var body: some View {
