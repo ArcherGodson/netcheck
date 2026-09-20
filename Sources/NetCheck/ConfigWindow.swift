@@ -160,6 +160,8 @@ struct ConfigView: View {
         )
         
         editWindow.title = network.name.isEmpty ? "Add Network" : "Edit Network"
+        editWindow.level = .floating // Make it float above other windows
+        
         let contentView = NetworkEditView(
             network: network,
             onUpdate: { updatedNetwork in
@@ -171,9 +173,10 @@ struct ConfigView: View {
                     newConfig.networks.append(updatedNetwork)
                 }
                 onSave(newConfig)
-                editWindow.close()
+                window.endSheet(editWindow)
             },
-            window: editWindow
+            window: editWindow,
+            parentWindow: window
         )
         let hostingController = NSHostingController(rootView: contentView)
         editWindow.contentViewController = hostingController
@@ -181,9 +184,13 @@ struct ConfigView: View {
         // Force the window to have the correct size
         editWindow.setContentSize(NSSize(width: 900, height: 900))
         editWindow.center()
-        editWindow.makeKeyAndOrderFront(nil)
         
-        DiagnosticLogger.shared.log("Edit window created and shown with size: \(editWindow.frame.size)")
+        // Run the window as a modal sheet
+        window.beginSheet(editWindow) { response in
+            DiagnosticLogger.shared.log("Edit sheet closed with response: \(response)")
+        }
+        
+        DiagnosticLogger.shared.log("Edit sheet opened as modal")
     }
 }
 
@@ -245,11 +252,13 @@ struct NetworkEditView: View {
     private var network: Network
     private let onUpdate: (Network) -> Void
     let window: NSWindow
+    let parentWindow: NSWindow
     
-    init(network: Network, onUpdate: @escaping (Network) -> Void, window: NSWindow) {
+    init(network: Network, onUpdate: @escaping (Network) -> Void, window: NSWindow, parentWindow: NSWindow) {
         self.network = network
         self.onUpdate = onUpdate
         self.window = window
+        self.parentWindow = parentWindow
         DiagnosticLogger.shared.log("NetworkEditView initialized for: \(network.name)")
     }
     
@@ -328,7 +337,7 @@ struct NetworkEditView: View {
             HStack {
                 Button("Close") {
                     DiagnosticLogger.shared.log("Close button pressed in edit view")
-                    window.close()
+                    parentWindow.endSheet(window)
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)

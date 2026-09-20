@@ -9,13 +9,22 @@ class TrayIconManager: ObservableObject {
     var onRefresh: (() -> Void)?
     
     func updateTrayIcons(for networks: [Network]) {
+        print("TrayIconManager: Updating icons for \(networks.count) networks")
+        for network in networks {
+            print("TrayIconManager: - \(network.name) (id: \(network.id))")
+        }
+        
         // Remove networks that no longer exist
         let currentIds = Set(networks.map { $0.id })
         let removedIds = Set(statusItems.keys).subtracting(currentIds)
         
+        print("TrayIconManager: Current status items: \(statusItems.keys.count)")
+        print("TrayIconManager: Networks to remove: \(removedIds)")
+        
         for id in removedIds {
             if let statusItem = statusItems[id] {
                 NSStatusBar.system.removeStatusItem(statusItem)
+                print("TrayIconManager: Removed status item for id: \(id)")
             }
             statusItems.removeValue(forKey: id)
             menuManagers.removeValue(forKey: id)
@@ -25,11 +34,17 @@ class TrayIconManager: ObservableObject {
         for network in networks {
             updateOrCreateStatusItem(for: network)
         }
+        
+        print("TrayIconManager: Total status items after update: \(statusItems.keys.count)")
     }
     
     private func updateOrCreateStatusItem(for network: Network) {
+        print("TrayIconManager: Processing network \(network.name) (id: \(network.id))")
+        print("TrayIconManager: Status item exists? \(statusItems[network.id] != nil)")
+        
         if let statusItem = statusItems[network.id] {
             // Update existing status item
+            print("TrayIconManager: Updating existing status item")
             updateStatusItem(statusItem, for: network)
             
             // Update menu manager callbacks
@@ -41,6 +56,7 @@ class TrayIconManager: ObservableObject {
             }
         } else {
             // Create new status item
+            print("TrayIconManager: Creating new status item")
             let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
             statusItems[network.id] = statusItem
             updateStatusItem(statusItem, for: network)
@@ -51,6 +67,8 @@ class TrayIconManager: ObservableObject {
             menuManager.onRefresh = onRefresh
             menuManagers[network.id] = menuManager
             statusItem.menu = menuManager.createMenu()
+            
+            print("TrayIconManager: Created status item for network: \(network.name)")
         }
     }
     
