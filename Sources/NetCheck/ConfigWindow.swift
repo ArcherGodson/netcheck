@@ -1,6 +1,5 @@
 import SwiftUI
 import AppKit
-import os.log
 
 class ConfigWindow: NSWindow {
     init(config: AppConfig, onSave: @escaping (AppConfig) -> Void) {
@@ -270,7 +269,7 @@ struct NetworkEditView: View {
                         DiagnosticLogger.shared.log("Network name changed to: \(newName)")
                         var updatedNetwork = network
                         updatedNetwork.name = newName
-                        // Don't call onUpdate here - only save on close
+                        onUpdate(updatedNetwork)
                     }
                 ))
                     .textFieldStyle(.roundedBorder)
@@ -294,7 +293,7 @@ struct NetworkEditView: View {
                         var updatedNetwork = network
                         let newCheck = NetworkCheck(type: .icmp, host: "")
                         updatedNetwork.checks.append(newCheck)
-                        // Don't call onUpdate here - only save on close
+                        onUpdate(updatedNetwork)
                     }) {
                         Label("Add Check", systemImage: "plus")
                             .font(.body)
@@ -313,7 +312,7 @@ struct NetworkEditView: View {
                                 var updatedNetwork = network
                                 if let index = updatedNetwork.checks.firstIndex(where: { $0.id == check.id }) {
                                     updatedNetwork.checks.remove(at: index)
-                                    // Don't call onUpdate here - only save on close
+                                    onUpdate(updatedNetwork)
                                 }
                             })
                         }
@@ -329,22 +328,14 @@ struct NetworkEditView: View {
             
             // Buttons
             HStack {
-                Button("Cancel") {
-                    DiagnosticLogger.shared.log("Cancel button pressed in edit view")
+                Button("Close") {
+                    DiagnosticLogger.shared.log("Close button pressed in edit view")
                     window.close()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 
                 Spacer()
-                
-                Button("Save") {
-                    DiagnosticLogger.shared.log("Save button pressed in edit view")
-                    onUpdate(network)
-                    window.close()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
             }
             .frame(maxWidth: .infinity)
         }
