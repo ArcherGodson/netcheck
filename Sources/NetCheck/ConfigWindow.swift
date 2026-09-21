@@ -271,7 +271,7 @@ struct NetworkEditView: View {
                     
                     Button(action: {
                         DiagnosticLogger.shared.log("Add Check button pressed")
-                        let newCheck = NetworkCheck(type: .icmp, host: "")
+                        let newCheck = NetworkCheck(type: .tcp, host: "", port: 80)
                         viewModel.network.checks.append(newCheck)
                     }) {
                         Label("Add Check", systemImage: "plus")
@@ -345,39 +345,101 @@ struct CheckRow: View {
     let onDelete: () -> Void
     
     var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(check.description)
-                    .font(.body)
-                    .fontWeight(.medium)
+        VStack(alignment: .leading, spacing: 12) {
+            // Protocol type and status
+            HStack(spacing: 12) {
+                Picker("Protocol", selection: $check.type) {
+                    Text("ICMP").tag(CheckType.icmp)
+                    Text("TCP").tag(CheckType.tcp)
+                    Text("DNS").tag(CheckType.dns)
+                    Text("HTTP").tag(CheckType.http)
+                    Text("HTTPS").tag(CheckType.https)
+                    Text("SSH").tag(CheckType.ssh)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 300)
                 
-                HStack(spacing: 6) {
-                    Text(check.type.rawValue)
+                Spacer()
+                
+                Circle()
+                    .fill(check.status.colorSwiftUI)
+                    .frame(width: 10, height: 10)
+                
+                Button(action: {
+                    DiagnosticLogger.shared.log("CheckRow Remove button pressed")
+                    onDelete()
+                }) {
+                    Label("Remove", systemImage: "trash")
+                        .font(.body)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.regular)
+                .foregroundColor(.red)
+            }
+            
+            // Parameters based on check type
+            VStack(alignment: .leading, spacing: 8) {
+                // Host field (common for all types)
+                HStack {
+                    Text("Host:")
                         .font(.caption)
                         .foregroundColor(.secondary)
+                        .frame(width: 60, alignment: .leading)
                     
-                    Circle()
-                        .fill(check.status.colorSwiftUI)
-                        .frame(width: 8, height: 8)
+                    TextField("Enter host", text: $check.host)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.caption)
+                }
+                
+                // Port field (for TCP, HTTP, HTTPS, SSH)
+                if check.type == .tcp || check.type == .http || check.type == .https || check.type == .ssh {
+                    HStack {
+                        Text("Port:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(width: 60, alignment: .leading)
+                        
+                        TextField("Port", value: Binding(
+                            get: { check.port ?? defaultPort(for: check.type) },
+                            set: { check.port = $0 }
+                        ), formatter: NumberFormatter())
+                            .textFieldStyle(.roundedBorder)
+                            .font(.caption)
+                            .frame(width: 100)
+                    }
+                }
+                
+                // DNS server field (for DNS)
+                if check.type == .dns {
+                    HStack {
+                        Text("DNS Server:")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .frame(width: 60, alignment: .leading)
+                        
+                        TextField("Enter DNS server (optional)", text: Binding(
+                            get: { check.dnsServer ?? "" },
+                            set: { check.dnsServer = $0.isEmpty ? nil : $0 }
+                        ))
+                            .textFieldStyle(.roundedBorder)
+                            .font(.caption)
+                    }
                 }
             }
-            
-            Spacer()
-            
-            Button(action: {
-                DiagnosticLogger.shared.log("CheckRow Remove button pressed")
-                onDelete()
-            }) {
-                Label("Remove", systemImage: "trash")
-                    .font(.body)
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.regular)
-            .foregroundColor(.red)
         }
         .padding(12)
         .background(Color(NSColor.controlBackgroundColor))
         .cornerRadius(8)
+    }
+    
+    private func defaultPort(for type: CheckType) -> Int {
+        switch type {
+        case .http: return 80
+        case .https: return 443
+        case .ssh: return 22
+        case .tcp: return 80
+        default: return 0
+        }
     }
 }
 
