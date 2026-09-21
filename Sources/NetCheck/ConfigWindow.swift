@@ -25,12 +25,12 @@ class ConfigWindow: NSWindow {
 }
 
 struct ConfigView: View {
-    private var config: AppConfig
+    @ObservedObject private var viewModel: ConfigViewModel
     private let onSave: (AppConfig) -> Void
     let window: NSWindow
     
     init(config: AppConfig, onSave: @escaping (AppConfig) -> Void, window: NSWindow) {
-        self.config = config
+        self.viewModel = ConfigViewModel(config: config)
         self.onSave = onSave
         self.window = window
         DiagnosticLogger.shared.log("ConfigView initialized with \(config.networks.count) networks")
@@ -52,19 +52,11 @@ struct ConfigView: View {
                         .font(.body)
                         .foregroundColor(.secondary)
                     
-                    Text("\(Int(config.checkInterval))")
+                    Text("\(Int(viewModel.config.checkInterval))")
                         .font(.body)
                         .fontWeight(.medium)
                     
-                    Stepper("", value: Binding(
-                        get: { config.checkInterval },
-                        set: { newValue in
-                            DiagnosticLogger.shared.log("Interval changed to: \(newValue)")
-                            var newConfig = config
-                            newConfig.checkInterval = newValue
-                            onSave(newConfig)
-                        }
-                    ), in: 5...300, step: 5)
+                    Stepper("", value: $viewModel.config.checkInterval, in: 5...300, step: 5)
                         .labelsHidden()
                     
                     Text("seconds")
@@ -84,16 +76,15 @@ struct ConfigView: View {
             // Networks list
             ScrollView {
                 VStack(spacing: 12) {
-                    ForEach(config.networks) { network in
+                    ForEach(viewModel.config.networks) { network in
                         NetworkRow(network: network, onEdit: {
                             DiagnosticLogger.shared.log("Edit button pressed for network: \(network.name)")
                             showNetworkEditSheet(network: network)
                         }, onDelete: {
                             DiagnosticLogger.shared.log("Delete button pressed for network: \(network.name)")
-                            var newConfig = config
-                            if let index = newConfig.networks.firstIndex(where: { $0.id == network.id }) {
-                                newConfig.networks.remove(at: index)
-                                onSave(newConfig)
+                            if let index = viewModel.config.networks.firstIndex(where: { $0.id == network.id }) {
+                                viewModel.config.networks.remove(at: index)
+                                onSave(viewModel.config)
                             }
                         })
                     }
@@ -110,9 +101,8 @@ struct ConfigView: View {
                 Button(action: {
                     DiagnosticLogger.shared.log("Add Network button pressed")
                     let newNetwork = Network(name: "New Network")
-                    var newConfig = config
-                    newConfig.networks.append(newNetwork)
-                    onSave(newConfig)
+                    viewModel.config.networks.append(newNetwork)
+                    onSave(viewModel.config)
                     showNetworkEditSheet(network: newNetwork)
                 }) {
                     Label("Add Network", systemImage: "plus")
@@ -132,12 +122,12 @@ struct ConfigView: View {
                 
                 Button("Save") {
                     DiagnosticLogger.shared.log("Save button pressed")
-                    onSave(config)
+                    onSave(viewModel.config)
                     window.close()
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(config.networks.isEmpty)
+                .disabled(viewModel.config.networks.isEmpty)
             }
             .padding(20)
             .frame(maxWidth: .infinity)
@@ -167,13 +157,12 @@ struct ConfigView: View {
             network: network,
             onUpdate: { updatedNetwork in
                 DiagnosticLogger.shared.log("Network updated: \(updatedNetwork.name)")
-                var newConfig = config
-                if let index = newConfig.networks.firstIndex(where: { $0.id == updatedNetwork.id }) {
-                    newConfig.networks[index] = updatedNetwork
+                if let index = viewModel.config.networks.firstIndex(where: { $0.id == updatedNetwork.id }) {
+                    viewModel.config.networks[index] = updatedNetwork
                 } else {
-                    newConfig.networks.append(updatedNetwork)
+                    viewModel.config.networks.append(updatedNetwork)
                 }
-                onSave(newConfig)
+                onSave(viewModel.config)
             },
             window: editWindow
         )
@@ -425,5 +414,14 @@ class DiagnosticLogger {
                 try? logMessage.write(to: fileURL, atomically: true, encoding: .utf8)
             }
         }
+    }
+}
+
+// View model for configuration
+class ConfigViewModel: ObservableObject {
+    @Published var config: AppConfig
+    
+    init(config: AppConfig) {
+        self.config = config
     }
 }
