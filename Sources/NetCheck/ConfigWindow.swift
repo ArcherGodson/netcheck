@@ -153,7 +153,7 @@ struct ConfigView: View {
         
         let editWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 900, height: 900),
-            styleMask: [.titled, .closable],
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -161,6 +161,7 @@ struct ConfigView: View {
         editWindow.title = network.name.isEmpty ? "Add Network" : "Edit Network"
         editWindow.level = .floating // Make it float above other windows
         editWindow.hidesOnDeactivate = false // Don't hide when deactivated
+        editWindow.minSize = NSSize(width: 700, height: 700)
         
         let contentView = NetworkEditView(
             network: network,
