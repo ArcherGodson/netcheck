@@ -284,7 +284,6 @@ struct NetworkEditView: View {
                         DiagnosticLogger.shared.log("Add Check button pressed")
                         let newCheck = NetworkCheck(type: .icmp, host: "")
                         viewModel.network.checks.append(newCheck)
-                        onUpdate(viewModel.network)
                     }) {
                         Label("Add Check", systemImage: "plus")
                             .font(.body)
@@ -302,7 +301,6 @@ struct NetworkEditView: View {
                                 DiagnosticLogger.shared.log("Remove Check button pressed")
                                 if let index = viewModel.network.checks.firstIndex(where: { $0.id == check.id }) {
                                     viewModel.network.checks.remove(at: index)
-                                    onUpdate(viewModel.network)
                                 }
                             })
                         }
@@ -318,14 +316,22 @@ struct NetworkEditView: View {
             
             // Buttons
             HStack {
-                Button("Close") {
-                    DiagnosticLogger.shared.log("Close button pressed in edit view")
+                Button("Cancel") {
+                    DiagnosticLogger.shared.log("Cancel button pressed in edit view")
                     window.close()
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 
                 Spacer()
+                
+                Button("Save") {
+                    DiagnosticLogger.shared.log("Save button pressed in edit view")
+                    onUpdate(viewModel.network)
+                    window.close()
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
             }
             .frame(maxWidth: .infinity)
         }
