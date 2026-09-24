@@ -149,7 +149,7 @@ struct ConfigView: View {
         )
         
         editWindow.title = network.name.isEmpty ? "Add Network" : "Edit Network"
-        editWindow.level = .floating // Make it float above other windows
+        editWindow.level = .normal // Use normal level instead of floating to allow proper clipboard operations
         editWindow.hidesOnDeactivate = false // Don't hide when deactivated
         editWindow.minSize = NSSize(width: 700, height: 700)
         
