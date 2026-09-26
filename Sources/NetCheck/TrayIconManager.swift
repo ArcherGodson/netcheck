@@ -158,6 +158,12 @@ class TrayIconManager: ObservableObject {
             return "Unavailable"
         case .notChecked:
             return "Not Checked"
+        case .availableWithNotChecked:
+            return "Available (Some checks pending)"
+        case .partiallyAvailableWithNotChecked:
+            return "Partially Available (Some checks pending)"
+        case .unavailableWithNotChecked:
+            return "Unavailable (Some checks pending)"
         }
     }
     
@@ -268,6 +274,12 @@ class MenuManager {
             return "Unavailable"
         case .notChecked:
             return "Not Checked"
+        case .availableWithNotChecked:
+            return "Available (Some checks pending)"
+        case .partiallyAvailableWithNotChecked:
+            return "Partially Available (Some checks pending)"
+        case .unavailableWithNotChecked:
+            return "Unavailable (Some checks pending)"
         }
     }
     

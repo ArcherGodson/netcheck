@@ -8,12 +8,18 @@ actor NetworkMonitor {
     func checkNetwork(_ network: Network) async -> Network {
         var updatedChecks: [NetworkCheck] = []
         var availableCount = 0
+        var unavailableCount = 0
+        var notCheckedCount = 0
         
         for check in network.checks {
             let result = await performCheck(check)
             updatedChecks.append(result)
             if result.status == .available {
                 availableCount += 1
+            } else if result.status == .unavailable {
+                unavailableCount += 1
+            } else {
+                notCheckedCount += 1
             }
         }
         
@@ -24,12 +30,30 @@ actor NetworkMonitor {
         let totalChecks = network.checks.count
         if totalChecks == 0 {
             updatedNetwork.status = .notChecked
-        } else if availableCount == totalChecks {
-            updatedNetwork.status = .available
-        } else if availableCount > 0 {
-            updatedNetwork.status = .partiallyAvailable
+        } else if notCheckedCount == totalChecks {
+            // Все проверки еще не выполнены
+            updatedNetwork.status = .notChecked
+        } else if notCheckedCount > 0 {
+            // Есть хотя бы одна непроверенная проверка
+            if unavailableCount == 0 {
+                // Нет недоступных, значит все остальные доступны
+                updatedNetwork.status = .availableWithNotChecked
+            } else if availableCount == 0 {
+                // Нет доступных, значит все остальные недоступны
+                updatedNetwork.status = .unavailableWithNotChecked
+            } else {
+                // Есть и доступные, и недоступные
+                updatedNetwork.status = .partiallyAvailableWithNotChecked
+            }
         } else {
-            updatedNetwork.status = .unavailable
+            // Все проверки выполнены
+            if availableCount == totalChecks {
+                updatedNetwork.status = .available
+            } else if unavailableCount == totalChecks {
+                updatedNetwork.status = .unavailable
+            } else {
+                updatedNetwork.status = .partiallyAvailable
+            }
         }
         
         return updatedNetwork

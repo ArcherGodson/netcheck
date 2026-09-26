@@ -90,6 +90,9 @@ enum NetworkStatus: Equatable, Codable {
     case partiallyAvailable
     case unavailable
     case notChecked
+    case availableWithNotChecked // блёклый зелёный
+    case partiallyAvailableWithNotChecked // блёклый оранжевый
+    case unavailableWithNotChecked // блёклый красный
     
     var color: NSColor {
         switch self {
@@ -101,6 +104,12 @@ enum NetworkStatus: Equatable, Codable {
             return .systemRed
         case .notChecked:
             return .systemGray
+        case .availableWithNotChecked:
+            return NSColor.systemGreen.withAlphaComponent(0.5)
+        case .partiallyAvailableWithNotChecked:
+            return NSColor.systemYellow.withAlphaComponent(0.5)
+        case .unavailableWithNotChecked:
+            return NSColor.systemRed.withAlphaComponent(0.5)
         }
     }
     
@@ -114,6 +123,12 @@ enum NetworkStatus: Equatable, Codable {
             return .red
         case .notChecked:
             return .gray
+        case .availableWithNotChecked:
+            return .green.opacity(0.5)
+        case .partiallyAvailableWithNotChecked:
+            return .yellow.opacity(0.5)
+        case .unavailableWithNotChecked:
+            return .red.opacity(0.5)
         }
     }
 }
