@@ -119,6 +119,7 @@ struct ConfigView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .keyboardShortcut(.cancelAction)
                 
                 Button("Save") {
                     DiagnosticLogger.shared.log("Save button pressed")
@@ -128,6 +129,7 @@ struct ConfigView: View {
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
                 .disabled(viewModel.config.networks.isEmpty)
+                .keyboardShortcut(.defaultAction)
             }
             .padding(20)
             .frame(maxWidth: .infinity)
@@ -141,19 +143,7 @@ struct ConfigView: View {
     private func showNetworkEditSheet(network: Network) {
         DiagnosticLogger.shared.log("Opening edit sheet for network: \(network.name)")
         
-        let editWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 900),
-            styleMask: [.titled, .closable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        
-        editWindow.title = network.name.isEmpty ? "Add Network" : "Edit Network"
-        editWindow.level = .normal // Use normal level instead of floating to allow proper clipboard operations
-        editWindow.hidesOnDeactivate = false // Don't hide when deactivated
-        editWindow.minSize = NSSize(width: 700, height: 700)
-        
-        let contentView = NetworkEditView(
+        let editWindow = EditWindow(
             network: network,
             onUpdate: { updatedNetwork in
                 DiagnosticLogger.shared.log("Network updated: \(updatedNetwork.name)")
@@ -163,18 +153,41 @@ struct ConfigView: View {
                     viewModel.config.networks.append(updatedNetwork)
                 }
                 onSave(viewModel.config)
-            },
-            window: editWindow
+            }
         )
-        let hostingController = NSHostingController(rootView: contentView)
-        editWindow.contentViewController = hostingController
         
-        // Force the window to have the correct size
-        editWindow.setContentSize(NSSize(width: 900, height: 900))
-        editWindow.center()
         editWindow.makeKeyAndOrderFront(nil)
         
         DiagnosticLogger.shared.log("Edit window created and shown with size: \(editWindow.frame.size)")
+    }
+}
+
+class EditWindow: NSWindow {
+    init(network: Network, onUpdate: @escaping (Network) -> Void) {
+        super.init(
+            contentRect: NSRect(x: 0, y: 0, width: 900, height: 900),
+            styleMask: [.titled, .closable, .resizable],
+            backing: .buffered,
+            defer: false
+        )
+        
+        self.title = network.name.isEmpty ? "Add Network" : "Edit Network"
+        self.level = .normal
+        self.hidesOnDeactivate = false
+        self.minSize = NSSize(width: 700, height: 700)
+        
+        let contentView = NetworkEditView(
+            network: network,
+            onUpdate: onUpdate,
+            window: self
+        )
+        let hostingController = NSHostingController(rootView: contentView)
+        self.contentViewController = hostingController
+        
+        self.setContentSize(NSSize(width: 900, height: 900))
+        self.center()
+        
+        DiagnosticLogger.shared.log("EditWindow initialized with size: \(self.frame.size)")
     }
 }
 
@@ -311,6 +324,7 @@ struct NetworkEditView: View {
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
+                .keyboardShortcut(.cancelAction)
                 
                 Spacer()
                 
@@ -321,6 +335,7 @@ struct NetworkEditView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
+                .keyboardShortcut(.defaultAction)
             }
             .frame(maxWidth: .infinity)
         }
