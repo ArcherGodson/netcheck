@@ -33,27 +33,53 @@ class TrayIconManager: ObservableObject {
             statusItem.menu = menuManager?.createMenu()
             
             // Create tooltip with all network info
-            let tooltip = networks.map { network in
-                let status = statusString(for: network.status)
-                let availableChecks = network.checks.filter { $0.status == .available }.count
-                let totalChecks = network.checks.count
-                return "\(network.name): \(status) (\(availableChecks)/\(totalChecks))"
-            }.joined(separator: "\n")
+            var tooltipLines: [String] = []
+            if networks.count <= 4 {
+                // Show each network individually
+                tooltipLines = networks.map { network in
+                    let status = statusString(for: network.status)
+                    let availableChecks = network.checks.filter { $0.status == .available }.count
+                    let totalChecks = network.checks.count
+                    return "\(network.name): \(status) (\(availableChecks)/\(totalChecks))"
+                }
+            } else {
+                // Group by status
+                let groupedNetworks = Dictionary(grouping: networks) { $0.status }
+                for (status, nets) in groupedNetworks {
+                    let networkNames = nets.map { $0.name }.joined(separator: ", ")
+                    let statusStr = statusString(for: status)
+                    tooltipLines.append("\(statusStr): \(networkNames)")
+                }
+            }
             
-            statusItem.button?.toolTip = tooltip
+            statusItem.button?.toolTip = tooltipLines.joined(separator: "\n")
         }
         
         print("TrayIconManager: Updated unified icon for \(networks.count) networks")
     }
     
     private func createUnifiedIcon(for networks: [Network]) -> NSImage {
-        let size = NSSize(width: 32, height: 32) // Larger icon for better visibility
+        let size = NSSize(width: 32, height: 32)
         let image = NSImage(size: size)
         image.isTemplate = false
         
-        // Limit to 4 networks for visual clarity
-        let displayNetworks = Array(networks.prefix(4))
-        let count = displayNetworks.count
+        // Group networks by status
+        var groupedNetworks: [NetworkStatus: [Network]] = [:]
+        for network in networks {
+            groupedNetworks[network.status, default: []].append(network)
+        }
+        
+        // Determine display strategy
+        let displayItems: [(NetworkStatus, [Network])]
+        if networks.count <= 4 {
+            // Show each network individually
+            displayItems = networks.map { ($0.status, [$0]) }
+        } else {
+            // Group by status if more than 4 networks
+            displayItems = Array(groupedNetworks)
+        }
+        
+        let count = displayItems.count
         
         // Create a new bitmap context for drawing
         guard let bitmap = CGContext(
@@ -73,8 +99,9 @@ class TrayIconManager: ObservableObject {
         let cellWidth = size.width / CGFloat(gridSize)
         let cellHeight = size.height / CGFloat(gridSize)
         
-        // Draw each network's status
-        for (index, network) in displayNetworks.enumerated() {
+        // Draw each status/group
+        for (index, item) in displayItems.enumerated() {
+            let (status, networksInGroup) = item
             let row = index / gridSize
             let col = index % gridSize
             
@@ -83,26 +110,32 @@ class TrayIconManager: ObservableObject {
             let rect = CGRect(x: x, y: y, width: cellWidth, height: cellHeight)
             
             // Draw colored rectangle for status
-            let color = network.status.color
+            let color = status.color
             bitmap.setFillColor(color.cgColor)
             bitmap.fill(rect)
             
-            // Draw first letter of network name
+            // Draw count or letter
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: NSFont.systemFont(ofSize: 10, weight: .bold),
                 .foregroundColor: NSColor.white
             ]
             
-            let firstLetter = String(network.name.first ?? "N")
-            let letterSize = firstLetter.size(withAttributes: attributes)
-            let letterRect = CGRect(
-                x: x + (cellWidth - letterSize.width) / 2,
-                y: y + (cellHeight - letterSize.height) / 2,
-                width: letterSize.width,
-                height: letterSize.height
+            let text: String
+            if networksInGroup.count == 1 {
+                text = String(networksInGroup[0].name.first ?? "N")
+            } else {
+                text = String(networksInGroup.count)
+            }
+            
+            let textSize = text.size(withAttributes: attributes)
+            let textRect = CGRect(
+                x: x + (cellWidth - textSize.width) / 2,
+                y: y + (cellHeight - textSize.height) / 2,
+                width: textSize.width,
+                height: textSize.height
             )
             
-            firstLetter.draw(in: letterRect, withAttributes: attributes)
+            text.draw(in: textRect, withAttributes: attributes)
         }
         
         // Draw border around cells
