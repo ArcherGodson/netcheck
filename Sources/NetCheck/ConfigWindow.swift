@@ -73,14 +73,11 @@ struct ConfigView: View {
             
             Divider()
             
-            // Networks list
+            // Networks list with inline editing
             ScrollView {
-                VStack(spacing: 12) {
-                    ForEach(viewModel.config.networks) { network in
-                        NetworkRow(network: network, onEdit: {
-                            DiagnosticLogger.shared.log("Edit button pressed for network: \(network.name)")
-                            showNetworkEditSheet(network: network)
-                        }, onDelete: {
+                VStack(spacing: 16) {
+                    ForEach($viewModel.config.networks) { $network in
+                        NetworkEditorView(network: $network, onDelete: {
                             DiagnosticLogger.shared.log("Delete button pressed for network: \(network.name)")
                             if let index = viewModel.config.networks.firstIndex(where: { $0.id == network.id }) {
                                 viewModel.config.networks.remove(at: index)
@@ -103,7 +100,6 @@ struct ConfigView: View {
                     let newNetwork = Network(name: "New Network")
                     viewModel.config.networks.append(newNetwork)
                     onSave(viewModel.config)
-                    showNetworkEditSheet(network: newNetwork)
                 }) {
                     Label("Add Network", systemImage: "plus")
                         .font(.body)
@@ -139,96 +135,37 @@ struct ConfigView: View {
             DiagnosticLogger.shared.log("ConfigView appeared with window size: \(window.frame.size)")
         }
     }
-    
-    private func showNetworkEditSheet(network: Network) {
-        DiagnosticLogger.shared.log("Opening edit sheet for network: \(network.name)")
-        
-        let editWindow = EditWindow(
-            network: network,
-            onUpdate: { updatedNetwork in
-                DiagnosticLogger.shared.log("Network updated: \(updatedNetwork.name)")
-                if let index = viewModel.config.networks.firstIndex(where: { $0.id == updatedNetwork.id }) {
-                    viewModel.config.networks[index] = updatedNetwork
-                } else {
-                    viewModel.config.networks.append(updatedNetwork)
-                }
-                onSave(viewModel.config)
-            }
-        )
-        
-        editWindow.makeKeyAndOrderFront(nil)
-        
-        DiagnosticLogger.shared.log("Edit window created and shown with size: \(editWindow.frame.size)")
-    }
 }
 
-class EditWindow: NSWindow {
-    init(network: Network, onUpdate: @escaping (Network) -> Void) {
-        super.init(
-            contentRect: NSRect(x: 0, y: 0, width: 900, height: 900),
-            styleMask: [.titled, .closable, .resizable],
-            backing: .buffered,
-            defer: false
-        )
-        
-        self.title = network.name.isEmpty ? "Add Network" : "Edit Network"
-        self.level = .normal
-        self.hidesOnDeactivate = false
-        self.minSize = NSSize(width: 700, height: 700)
-        
-        let contentView = NetworkEditView(
-            network: network,
-            onUpdate: onUpdate,
-            window: self
-        )
-        let hostingController = NSHostingController(rootView: contentView)
-        self.contentViewController = hostingController
-        
-        self.setContentSize(NSSize(width: 900, height: 900))
-        self.center()
-        
-        DiagnosticLogger.shared.log("EditWindow initialized with size: \(self.frame.size)")
-    }
-}
-
-struct NetworkRow: View {
-    let network: Network
-    let onEdit: () -> Void
+struct NetworkEditorView: View {
+    @Binding var network: Network
     let onDelete: () -> Void
     
     var body: some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(network.name.isEmpty ? "Unnamed Network" : network.name)
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                
-                HStack(spacing: 8) {
-                    Text("\(network.checks.count) checks")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 16) {
+            // Network header with delete button
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField("Network Name", text: $network.name)
+                        .textFieldStyle(.roundedBorder)
+                        .font(.title3)
+                        .fontWeight(.semibold)
                     
-                    Circle()
-                        .fill(network.status.colorSwiftUI)
-                        .frame(width: 10, height: 10)
+                    HStack(spacing: 8) {
+                        Text("\(network.checks.count) checks")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        
+                        Circle()
+                            .fill(network.status.colorSwiftUI)
+                            .frame(width: 10, height: 10)
+                    }
                 }
-            }
-            
-            Spacer()
-            
-            HStack(spacing: 12) {
-                Button(action: {
-                    DiagnosticLogger.shared.log("NetworkRow Edit button pressed for: \(network.name)")
-                    onEdit()
-                }) {
-                    Label("Edit", systemImage: "pencil")
-                        .font(.body)
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.regular)
+                
+                Spacer()
                 
                 Button(action: {
-                    DiagnosticLogger.shared.log("NetworkRow Delete button pressed for: \(network.name)")
+                    DiagnosticLogger.shared.log("Delete button pressed for network: \(network.name)")
                     onDelete()
                 }) {
                     Label("Delete", systemImage: "trash")
@@ -238,123 +175,48 @@ struct NetworkRow: View {
                 .controlSize(.regular)
                 .foregroundColor(.red)
             }
-        }
-        .padding(16)
-        .background(Color(NSColor.controlBackgroundColor))
-        .cornerRadius(12)
-    }
-}
-
-struct NetworkEditView: View {
-    @ObservedObject private var viewModel: NetworkEditViewModel
-    private let onUpdate: (Network) -> Void
-    let window: NSWindow
-    
-    init(network: Network, onUpdate: @escaping (Network) -> Void, window: NSWindow) {
-        self.viewModel = NetworkEditViewModel(network: network)
-        self.onUpdate = onUpdate
-        self.window = window
-        DiagnosticLogger.shared.log("NetworkEditView initialized for: \(network.name)")
-    }
-    
-    var body: some View {
-        VStack(spacing: 20) {
-            // Network name
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Network Name")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-                
-                TextField("Enter network name", text: $viewModel.network.name)
-                    .textFieldStyle(.roundedBorder)
-                    .font(.body)
-            }
-            .frame(maxWidth: .infinity)
             
             Divider()
             
             // Checks section
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     Text("Network Checks")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(.headline)
+                        .fontWeight(.semibold)
                     
                     Spacer()
                     
                     Button(action: {
                         DiagnosticLogger.shared.log("Add Check button pressed")
                         let newCheck = NetworkCheck(type: .tcp, host: "", port: 80)
-                        viewModel.network.checks.append(newCheck)
+                        network.checks.append(newCheck)
                     }) {
                         Label("Add Check", systemImage: "plus")
-                            .font(.body)
+                            .font(.caption)
                     }
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.regular)
+                    .controlSize(.small)
                 }
-                .frame(maxWidth: .infinity)
                 
                 // Checks list
-                ScrollView {
-                    VStack(spacing: 12) {
-                        ForEach($viewModel.network.checks) { $check in
-                            CheckRow(check: $check, onDelete: {
-                                DiagnosticLogger.shared.log("Remove Check button pressed")
-                                if let index = viewModel.network.checks.firstIndex(where: { $0.id == check.id }) {
-                                    viewModel.network.checks.remove(at: index)
-                                }
-                            })
-                        }
+                VStack(spacing: 8) {
+                    ForEach($network.checks) { $check in
+                        CheckRow(check: $check, onDelete: {
+                            DiagnosticLogger.shared.log("Remove Check button pressed")
+                            if let index = network.checks.firstIndex(where: { $0.id == check.id }) {
+                                network.checks.remove(at: index)
+                            }
+                        })
                     }
-                    .padding(4)
                 }
-                .frame(height: 400)
-                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
-            
-            Divider()
-            
-            // Buttons
-            HStack {
-                Button("Cancel") {
-                    DiagnosticLogger.shared.log("Cancel button pressed in edit view")
-                    window.close()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .keyboardShortcut(.cancelAction)
-                
-                Spacer()
-                
-                Button("Save") {
-                    DiagnosticLogger.shared.log("Save button pressed in edit view")
-                    onUpdate(viewModel.network)
-                    window.close()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .keyboardShortcut(.defaultAction)
-            }
-            .frame(maxWidth: .infinity)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .onAppear {
-            DiagnosticLogger.shared.log("NetworkEditView appeared with \(viewModel.network.checks.count) checks, window size: \(window.frame.size)")
-        }
+        .padding(16)
+        .background(Color(NSColor.controlBackgroundColor))
+        .cornerRadius(12)
     }
 }
-
-class NetworkEditViewModel: ObservableObject {
-    @Published var network: Network
-    
-    init(network: Network) {
-        self.network = network
-    }
-}
-
 struct CheckRow: View {
     @Binding var check: NetworkCheck
     let onDelete: () -> Void
