@@ -99,6 +99,7 @@ struct ConfigView: View {
                     DiagnosticLogger.shared.log("Add Network button pressed")
                     let newNetwork = Network(name: "New Network")
                     viewModel.config.networks.append(newNetwork)
+                    // Save immediately to trigger tray icon update
                     onSave(viewModel.config)
                 }) {
                     Label("Add Network", systemImage: "plus")
@@ -109,14 +110,6 @@ struct ConfigView: View {
                 
                 Spacer()
                 
-                Button("Cancel") {
-                    DiagnosticLogger.shared.log("Cancel button pressed")
-                    window.close()
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.large)
-                .keyboardShortcut(.cancelAction)
-                
                 Button("Save") {
                     DiagnosticLogger.shared.log("Save button pressed")
                     onSave(viewModel.config)
@@ -126,6 +119,14 @@ struct ConfigView: View {
                 .controlSize(.large)
                 .disabled(viewModel.config.networks.isEmpty)
                 .keyboardShortcut(.defaultAction)
+                
+                Button("Cancel") {
+                    DiagnosticLogger.shared.log("Cancel button pressed")
+                    window.close()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .keyboardShortcut(.cancelAction)
             }
             .padding(20)
             .frame(maxWidth: .infinity)
