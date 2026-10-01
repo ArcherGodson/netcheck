@@ -3,103 +3,57 @@ import SwiftUI
 
 @MainActor
 class TrayIconManager: ObservableObject {
-    private var statusItems: [UUID: NSStatusItem] = [:]
-    private var menuManagers: [UUID: MenuManager] = [:]
+    private var statusItem: NSStatusItem?
+    private var menuManager: UnifiedMenuManager?
     var onConfigure: (() -> Void)?
     var onRefresh: (() -> Void)?
     
     func updateTrayIcons(for networks: [Network]) {
-        print("TrayIconManager: Updating icons for \(networks.count) networks")
+        print("TrayIconManager: Updating single icon for \(networks.count) networks")
         for network in networks {
             print("TrayIconManager: - \(network.name) (id: \(network.id))")
         }
         
-        // Remove networks that no longer exist
-        let currentIds = Set(networks.map { $0.id })
-        let removedIds = Set(statusItems.keys).subtracting(currentIds)
-        
-        print("TrayIconManager: Current status items: \(statusItems.keys.count)")
-        print("TrayIconManager: Networks to remove: \(removedIds)")
-        
-        for id in removedIds {
-            if let statusItem = statusItems[id] {
-                NSStatusBar.system.removeStatusItem(statusItem)
-                print("TrayIconManager: Removed status item for id: \(id)")
-            }
-            statusItems.removeValue(forKey: id)
-            menuManagers.removeValue(forKey: id)
-        }
-        
-        // Update or create status items for each network
-        for network in networks {
-            updateOrCreateStatusItem(for: network)
-        }
-        
-        print("TrayIconManager: Total status items after update: \(statusItems.keys.count)")
-    }
-    
-    private func updateOrCreateStatusItem(for network: Network) {
-        print("TrayIconManager: Processing network \(network.name) (id: \(network.id))")
-        print("TrayIconManager: Status item exists? \(statusItems[network.id] != nil)")
-        
-        if let statusItem = statusItems[network.id] {
-            // Update existing status item
-            print("TrayIconManager: Updating existing status item")
-            updateStatusItem(statusItem, for: network)
-            
-            // Update menu manager callbacks
-            if let menuManager = menuManagers[network.id] {
-                menuManager.network = network
-                menuManager.onConfigure = onConfigure
-                menuManager.onRefresh = onRefresh
-                statusItem.menu = menuManager.createMenu()
-            }
-        } else {
-            // Create new status item
+        // Create status item if it doesn't exist
+        if statusItem == nil {
             print("TrayIconManager: Creating new status item")
-            let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-            statusItems[network.id] = statusItem
-            updateStatusItem(statusItem, for: network)
-            
-            // Create menu manager
-            let menuManager = MenuManager(network: network)
-            menuManager.onConfigure = onConfigure
-            menuManager.onRefresh = onRefresh
-            menuManagers[network.id] = menuManager
-            statusItem.menu = menuManager.createMenu()
-            
-            print("TrayIconManager: Created status item for network: \(network.name)")
+            statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         }
+        
+        // Update the single icon with all network statuses
+        if let statusItem = statusItem {
+            let icon = createUnifiedIcon(for: networks)
+            statusItem.button?.image = icon
+            statusItem.button?.image?.isTemplate = false
+            
+            // Create unified menu manager
+            menuManager = UnifiedMenuManager(networks: networks)
+            menuManager?.onConfigure = onConfigure
+            menuManager?.onRefresh = onRefresh
+            statusItem.menu = menuManager?.createMenu()
+            
+            // Create tooltip with all network info
+            let tooltip = networks.map { network in
+                let status = statusString(for: network.status)
+                let availableChecks = network.checks.filter { $0.status == .available }.count
+                let totalChecks = network.checks.count
+                return "\(network.name): \(status) (\(availableChecks)/\(totalChecks))"
+            }.joined(separator: "\n")
+            
+            statusItem.button?.toolTip = tooltip
+        }
+        
+        print("TrayIconManager: Updated unified icon for \(networks.count) networks")
     }
     
-    private func updateStatusItem(_ statusItem: NSStatusItem, for network: Network) {
-        let icon = createIcon(for: network.status, name: network.name)
-        if let button = statusItem.button {
-            button.image = icon
-            button.image?.isTemplate = false // Important: ensure image is not treated as template
-            
-            let lastCheckTime = network.lastCheck.map { 
-                let formatter = DateFormatter()
-                formatter.timeStyle = .medium
-                return "Last check: \(formatter.string(from: $0))"
-            } ?? "Not checked yet"
-            
-            let availableChecks = network.checks.filter { $0.status == .available }.count
-            let totalChecks = network.checks.count
-            
-            button.toolTip = """
-            \(network.name)
-            Status: \(statusString(for: network.status))
-            Checks: \(availableChecks)/\(totalChecks) available
-            \(lastCheckTime)
-            """
-        }
-    }
-    
-    private func createIcon(for status: NetworkStatus, name: String) -> NSImage {
-        let size = NSSize(width: 22, height: 22)
+    private func createUnifiedIcon(for networks: [Network]) -> NSImage {
+        let size = NSSize(width: 32, height: 32) // Larger icon for better visibility
         let image = NSImage(size: size)
         image.isTemplate = false
+        
+        // Limit to 4 networks for visual clarity
+        let displayNetworks = Array(networks.prefix(4))
+        let count = displayNetworks.count
         
         // Create a new bitmap context for drawing
         guard let bitmap = CGContext(
@@ -114,31 +68,60 @@ class TrayIconManager: ObservableObject {
             return image
         }
         
-        // Draw the circle with status color
-        let rect = CGRect(x: 0, y: 0, width: size.width, height: size.height)
-        let path = CGPath(ellipseIn: rect, transform: nil)
-        bitmap.addPath(path)
+        // Calculate grid layout
+        let gridSize = Int(ceil(sqrt(Double(count))))
+        let cellWidth = size.width / CGFloat(gridSize)
+        let cellHeight = size.height / CGFloat(gridSize)
         
-        let color = status.color
-        bitmap.setFillColor(color.cgColor)
-        bitmap.fillPath()
+        // Draw each network's status
+        for (index, network) in displayNetworks.enumerated() {
+            let row = index / gridSize
+            let col = index % gridSize
+            
+            let x = CGFloat(col) * cellWidth
+            let y = CGFloat(row) * cellHeight
+            let rect = CGRect(x: x, y: y, width: cellWidth, height: cellHeight)
+            
+            // Draw colored rectangle for status
+            let color = network.status.color
+            bitmap.setFillColor(color.cgColor)
+            bitmap.fill(rect)
+            
+            // Draw first letter of network name
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 10, weight: .bold),
+                .foregroundColor: NSColor.white
+            ]
+            
+            let firstLetter = String(network.name.first ?? "N")
+            let letterSize = firstLetter.size(withAttributes: attributes)
+            let letterRect = CGRect(
+                x: x + (cellWidth - letterSize.width) / 2,
+                y: y + (cellHeight - letterSize.height) / 2,
+                width: letterSize.width,
+                height: letterSize.height
+            )
+            
+            firstLetter.draw(in: letterRect, withAttributes: attributes)
+        }
         
-        // Draw first letter of network name
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 12, weight: .bold),
-            .foregroundColor: NSColor.white
-        ]
+        // Draw border around cells
+        bitmap.setStrokeColor(NSColor.black.cgColor)
+        bitmap.setLineWidth(1.0)
         
-        let firstLetter = String(name.first ?? "N")
-        let letterSize = firstLetter.size(withAttributes: attributes)
-        let letterRect = CGRect(
-            x: (size.width - letterSize.width) / 2,
-            y: (size.height - letterSize.height) / 2,
-            width: letterSize.width,
-            height: letterSize.height
-        )
-        
-        firstLetter.draw(in: letterRect, withAttributes: attributes)
+        for i in 1..<gridSize {
+            // Vertical lines
+            let x = CGFloat(i) * cellWidth
+            bitmap.move(to: CGPoint(x: x, y: 0))
+            bitmap.addLine(to: CGPoint(x: x, y: size.height))
+            bitmap.strokePath()
+            
+            // Horizontal lines
+            let y = CGFloat(i) * cellHeight
+            bitmap.move(to: CGPoint(x: 0, y: y))
+            bitmap.addLine(to: CGPoint(x: size.width, y: y))
+            bitmap.strokePath()
+        }
         
         // Create image from context
         if let cgImage = bitmap.makeImage() {
@@ -167,48 +150,71 @@ class TrayIconManager: ObservableObject {
         }
     }
     
-    func updateMenu(for network: Network) {
-        // Update the menu manager with new network data
-        if let menuManager = menuManagers[network.id] {
-            menuManager.network = network
-            menuManager.onConfigure = onConfigure
-            menuManager.onRefresh = onRefresh
-            
-            // Recreate the menu for the status item
-            if let statusItem = statusItems[network.id] {
-                statusItem.menu = menuManager.createMenu()
-            }
+    func updateMenu(for networks: [Network]) {
+        menuManager?.networks = networks
+        if let statusItem = statusItem {
+            statusItem.menu = menuManager?.createMenu()
         }
     }
     
     func refreshAllMenus(for networks: [Network]) {
-        for network in networks {
-            updateMenu(for: network)
-        }
+        updateMenu(for: networks)
     }
 }
 
-class MenuManager {
-    var network: Network
+class UnifiedMenuManager {
+    var networks: [Network]
     var onConfigure: (() -> Void)?
     var onRefresh: (() -> Void)?
     
-    init(network: Network) {
-        self.network = network
+    init(networks: [Network]) {
+        self.networks = networks
     }
     
     func createMenu() -> NSMenu {
         let menu = NSMenu()
         
-        // Network name as title
-        let titleItem = NSMenuItem(title: network.name, action: nil, keyEquivalent: "")
+        // Title
+        let titleItem = NSMenuItem(title: "NetCheck - \(networks.count) Networks", action: nil, keyEquivalent: "")
         titleItem.isEnabled = false
         menu.addItem(titleItem)
         
         menu.addItem(NSMenuItem.separator())
         
+        // Add each network as a submenu
+        for network in networks {
+            let networkMenuItem = NSMenuItem(title: network.name, action: nil, keyEquivalent: "")
+            networkMenuItem.submenu = createNetworkMenu(for: network)
+            menu.addItem(networkMenuItem)
+        }
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Configure button
+        let configureItem = NSMenuItem(title: "Configure Networks...", action: #selector(configure), keyEquivalent: "")
+        configureItem.target = self
+        menu.addItem(configureItem)
+        
+        // Refresh button
+        let refreshItem = NSMenuItem(title: "Refresh Now", action: #selector(refresh), keyEquivalent: "r")
+        refreshItem.target = self
+        menu.addItem(refreshItem)
+        
+        menu.addItem(NSMenuItem.separator())
+        
+        // Quit application
+        let quitItem = NSMenuItem(title: "Quit NetCheck", action: #selector(quitApp), keyEquivalent: "q")
+        quitItem.target = self
+        menu.addItem(quitItem)
+        
+        return menu
+    }
+    
+    private func createNetworkMenu(for network: Network) -> NSMenu {
+        let menu = NSMenu()
+        
         // Status
-        let statusItem = NSMenuItem(title: "Status: \(statusString())", action: nil, keyEquivalent: "")
+        let statusItem = NSMenuItem(title: "Status: \(statusString(for: network.status))", action: nil, keyEquivalent: "")
         statusItem.isEnabled = false
         menu.addItem(statusItem)
         
@@ -242,30 +248,11 @@ class MenuManager {
             menu.addItem(checkItem)
         }
         
-        menu.addItem(NSMenuItem.separator())
-        
-        // Configure button
-        let configureItem = NSMenuItem(title: "Configure Networks...", action: #selector(configure), keyEquivalent: "")
-        configureItem.target = self
-        menu.addItem(configureItem)
-        
-        // Refresh button
-        let refreshItem = NSMenuItem(title: "Refresh Now", action: #selector(refresh), keyEquivalent: "r")
-        refreshItem.target = self
-        menu.addItem(refreshItem)
-        
-        menu.addItem(NSMenuItem.separator())
-        
-        // Quit application
-        let quitItem = NSMenuItem(title: "Quit NetCheck", action: #selector(quitApp), keyEquivalent: "q")
-        quitItem.target = self
-        menu.addItem(quitItem)
-        
         return menu
     }
     
-    private func statusString() -> String {
-        switch network.status {
+    private func statusString(for status: NetworkStatus) -> String {
+        switch status {
         case .available:
             return "Available"
         case .partiallyAvailable:

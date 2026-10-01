@@ -95,9 +95,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         await ConfigManager.shared.saveConfig(config)
         
         await MainActor.run {
-            // Update tray icons and menus for all networks
+            // Update tray icon and menu with all networks
             trayIconManager.updateTrayIcons(for: config.networks)
-            trayIconManager.refreshAllMenus(for: config.networks)
         }
     }
     
@@ -114,7 +113,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
                 await ConfigManager.shared.saveConfig(updatedConfig)
             }
             
-            // Force update tray icons with new configuration
+            // Update tray icon with new configuration
             self.trayIconManager.updateTrayIcons(for: updatedConfig.networks)
             
             // Restart timer with new interval

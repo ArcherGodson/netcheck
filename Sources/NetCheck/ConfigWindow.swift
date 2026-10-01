@@ -99,8 +99,6 @@ struct ConfigView: View {
                     DiagnosticLogger.shared.log("Add Network button pressed")
                     let newNetwork = Network(name: "New Network")
                     viewModel.config.networks.append(newNetwork)
-                    // Save immediately to trigger tray icon update
-                    onSave(viewModel.config)
                 }) {
                     Label("Add Network", systemImage: "plus")
                         .font(.body)
