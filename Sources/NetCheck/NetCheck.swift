@@ -109,9 +109,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             guard let self = self else { return }
             
             self.config = updatedConfig
-            Task {
-                await ConfigManager.shared.saveConfig(updatedConfig)
-            }
             
             // Update tray icon with new configuration
             self.trayIconManager.updateTrayIcons(for: updatedConfig.networks)

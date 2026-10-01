@@ -31,7 +31,14 @@ struct ConfigView: View {
     
     init(config: AppConfig, onSave: @escaping (AppConfig) -> Void, window: NSWindow) {
         self.viewModel = ConfigViewModel(config: config)
-        self.onSave = onSave
+        self.onSave = { updatedConfig in
+            // Save immediately to ConfigManager
+            Task {
+                await ConfigManager.shared.saveConfig(updatedConfig)
+            }
+            // Then call the original callback for tray icon updates
+            onSave(updatedConfig)
+        }
         self.window = window
         DiagnosticLogger.shared.log("ConfigView initialized with \(config.networks.count) networks")
     }
