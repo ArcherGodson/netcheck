@@ -56,7 +56,14 @@ struct ConfigView: View {
                         .font(.body)
                         .fontWeight(.medium)
                     
-                    Stepper("", value: $viewModel.config.checkInterval, in: 5...300, step: 5)
+                    Stepper("", value: Binding(
+                        get: { viewModel.config.checkInterval },
+                        set: { newValue in
+                            DiagnosticLogger.shared.log("Interval changed to: \(newValue)")
+                            viewModel.config.checkInterval = newValue
+                            onSave(viewModel.config)
+                        }
+                    ), in: 5...300, step: 5)
                         .labelsHidden()
                     
                     Text("seconds")
@@ -83,6 +90,8 @@ struct ConfigView: View {
                                 viewModel.config.networks.remove(at: index)
                                 onSave(viewModel.config)
                             }
+                        }, onSave: {
+                            onSave(viewModel.config)
                         })
                     }
                 }
@@ -99,6 +108,7 @@ struct ConfigView: View {
                     DiagnosticLogger.shared.log("Add Network button pressed")
                     let newNetwork = Network(name: "New Network")
                     viewModel.config.networks.append(newNetwork)
+                    onSave(viewModel.config)
                 }) {
                     Label("Add Network", systemImage: "plus")
                         .font(.body)
@@ -115,7 +125,6 @@ struct ConfigView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.large)
-                .disabled(viewModel.config.networks.isEmpty)
                 .keyboardShortcut(.defaultAction)
                 
                 Button("Cancel") {
@@ -139,13 +148,20 @@ struct ConfigView: View {
 struct NetworkEditorView: View {
     @Binding var network: Network
     let onDelete: () -> Void
+    let onSave: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             // Network header with delete button
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    TextField("Network Name", text: $network.name)
+                    TextField("Network Name", text: Binding(
+                        get: { network.name },
+                        set: { newValue in
+                            network.name = newValue
+                            onSave()
+                        }
+                    ))
                         .textFieldStyle(.roundedBorder)
                         .font(.title3)
                         .fontWeight(.semibold)
@@ -190,6 +206,7 @@ struct NetworkEditorView: View {
                         DiagnosticLogger.shared.log("Add Check button pressed")
                         let newCheck = NetworkCheck(type: .tcp, host: "", port: 80)
                         network.checks.append(newCheck)
+                        onSave()
                     }) {
                         Label("Add Check", systemImage: "plus")
                             .font(.caption)
@@ -205,7 +222,10 @@ struct NetworkEditorView: View {
                             DiagnosticLogger.shared.log("Remove Check button pressed")
                             if let index = network.checks.firstIndex(where: { $0.id == check.id }) {
                                 network.checks.remove(at: index)
+                                onSave()
                             }
+                        }, onSave: {
+                            onSave()
                         })
                     }
                 }
@@ -219,12 +239,19 @@ struct NetworkEditorView: View {
 struct CheckRow: View {
     @Binding var check: NetworkCheck
     let onDelete: () -> Void
+    let onSave: () -> Void
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             // Protocol type and status
             HStack(spacing: 12) {
-                Picker("Protocol", selection: $check.type) {
+                Picker("Protocol", selection: Binding(
+                    get: { check.type },
+                    set: { newValue in
+                        check.type = newValue
+                        onSave()
+                    }
+                )) {
                     Text("ICMP").tag(CheckType.icmp)
                     Text("TCP").tag(CheckType.tcp)
                     Text("DNS").tag(CheckType.dns)
@@ -262,7 +289,13 @@ struct CheckRow: View {
                         .foregroundColor(.secondary)
                         .frame(width: 60, alignment: .leading)
                     
-                    TextField("Enter host", text: $check.host)
+                    TextField("Enter host", text: Binding(
+                        get: { check.host },
+                        set: { newValue in
+                            check.host = newValue
+                            onSave()
+                        }
+                    ))
                         .textFieldStyle(.roundedBorder)
                         .font(.caption)
                 }
@@ -277,7 +310,10 @@ struct CheckRow: View {
                         
                         TextField("Port", value: Binding(
                             get: { check.port ?? defaultPort(for: check.type) },
-                            set: { check.port = $0 }
+                            set: { newValue in
+                                check.port = newValue
+                                onSave()
+                            }
                         ), formatter: NumberFormatter())
                             .textFieldStyle(.roundedBorder)
                             .font(.caption)
@@ -295,7 +331,10 @@ struct CheckRow: View {
                         
                         TextField("Enter DNS server (optional)", text: Binding(
                             get: { check.dnsServer ?? "" },
-                            set: { check.dnsServer = $0.isEmpty ? nil : $0 }
+                            set: { newValue in
+                                check.dnsServer = newValue.isEmpty ? nil : newValue
+                                onSave()
+                            }
                         ))
                             .textFieldStyle(.roundedBorder)
                             .font(.caption)
