@@ -58,6 +58,37 @@ struct NetworkCheck: Codable, Identifiable {
         self.lastCheck = nil
     }
     
+    // For saving to config file (without dynamic status)
+    struct CheckConfig: Codable {
+        let id: UUID
+        let type: CheckType
+        let host: String
+        let port: Int?
+        let dnsServer: String?
+        
+        init(from check: NetworkCheck) {
+            self.id = check.id
+            self.type = check.type
+            self.host = check.host
+            self.port = check.port
+            self.dnsServer = check.dnsServer
+        }
+    }
+    
+    var config: CheckConfig {
+        return CheckConfig(from: self)
+    }
+    
+    init(from config: CheckConfig) {
+        self.id = config.id
+        self.type = config.type
+        self.host = config.host
+        self.port = config.port
+        self.dnsServer = config.dnsServer
+        self.status = .notChecked
+        self.lastCheck = nil
+    }
+    
     var description: String {
         switch type {
         case .icmp:

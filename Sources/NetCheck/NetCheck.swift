@@ -92,7 +92,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         }
         
         config.networks = updatedNetworks
-        await ConfigManager.shared.saveConfig(config)
+        // Don't save config here - it would overwrite user's configuration
+        // Statuses are dynamic and should be recalculated on each launch
         
         await MainActor.run {
             // Update tray icon and menu with all networks

@@ -23,7 +23,18 @@ class ConfigManager {
         }
         
         do {
-            return try JSONDecoder().decode(AppConfig.self, from: data)
+            let config = try JSONDecoder().decode(AppConfig.self, from: data)
+            // Reset all dynamic statuses to notChecked
+            var cleanConfig = config
+            for i in 0..<cleanConfig.networks.count {
+                for j in 0..<cleanConfig.networks[i].checks.count {
+                    cleanConfig.networks[i].checks[j].status = .notChecked
+                    cleanConfig.networks[i].checks[j].lastCheck = nil
+                }
+                cleanConfig.networks[i].status = .notChecked
+                cleanConfig.networks[i].lastCheck = nil
+            }
+            return cleanConfig
         } catch {
             // If decoding fails (likely due to format change), return default config
             print("Failed to decode config, using default: \(error)")
@@ -32,11 +43,22 @@ class ConfigManager {
     }
     
     func saveConfig(_ config: AppConfig) async {
+        // Create a clean config without dynamic statuses
+        var cleanConfig = config
+        for i in 0..<cleanConfig.networks.count {
+            for j in 0..<cleanConfig.networks[i].checks.count {
+                cleanConfig.networks[i].checks[j].status = .notChecked
+                cleanConfig.networks[i].checks[j].lastCheck = nil
+            }
+            cleanConfig.networks[i].status = .notChecked
+            cleanConfig.networks[i].lastCheck = nil
+        }
+        
         let encoder = JSONEncoder()
         encoder.outputFormatting = .prettyPrinted
         encoder.dateEncodingStrategy = .iso8601
         
-        if let data = try? encoder.encode(config) {
+        if let data = try? encoder.encode(cleanConfig) {
             try? data.write(to: configURL)
         }
     }
