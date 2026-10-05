@@ -34,7 +34,7 @@ class TrayIconManager: ObservableObject {
             
             // Create tooltip with all network info
             var tooltipLines: [String] = []
-            if networks.count <= 4 {
+            if networks.count <= 6 {
                 // Show each network individually
                 tooltipLines = networks.map { network in
                     let status = statusString(for: network.status)
@@ -43,7 +43,7 @@ class TrayIconManager: ObservableObject {
                     return "\(network.name): \(status) (\(availableChecks)/\(totalChecks))"
                 }
             } else {
-                // Group by status
+                // Group by status for 7+ networks
                 var groupedNetworks: [NetworkStatus: [Network]] = [:]
                 for network in networks {
                     groupedNetworks[network.status, default: []].append(network)
@@ -67,12 +67,12 @@ class TrayIconManager: ObservableObject {
         image.isTemplate = false
         
         // Determine display strategy
-        if networks.count <= 4 {
-            // Use circular sector division for 1-4 networks
+        if networks.count <= 6 {
+            // Use circular sector division for 1-6 networks
             return createCircularIcon(for: networks, size: size)
         } else {
-            // Group by status if more than 4 networks
-            return createGroupedIcon(for: networks, size: size)
+            // Use horizontal lines for 7+ networks
+            return createHorizontalLinesIcon(for: networks, size: size)
         }
     }
     
@@ -120,6 +120,14 @@ class TrayIconManager: ObservableObject {
                 // 90° quadrants
                 startAngle = CGFloat(index) * (.pi / 2) - .pi / 2
                 endAngle = startAngle + (.pi / 2)
+            case 5:
+                // 72° sectors
+                startAngle = CGFloat(index) * (2 * .pi / 5) - .pi / 2
+                endAngle = startAngle + (2 * .pi / 5)
+            case 6:
+                // 60° sectors
+                startAngle = CGFloat(index) * (2 * .pi / 6) - .pi / 2
+                endAngle = startAngle + (2 * .pi / 6)
             default:
                 startAngle = 0
                 endAngle = 2 * .pi
@@ -138,7 +146,7 @@ class TrayIconManager: ObservableObject {
             
             // Draw first letter of network name
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 10, weight: .bold),
+                .font: NSFont.systemFont(ofSize: 8, weight: .bold),
                 .foregroundColor: NSColor.white
             ]
             
@@ -169,18 +177,11 @@ class TrayIconManager: ObservableObject {
         return image
     }
     
-    private func createGroupedIcon(for networks: [Network], size: NSSize) -> NSImage {
+    private func createHorizontalLinesIcon(for networks: [Network], size: NSSize) -> NSImage {
         let image = NSImage(size: size)
         image.isTemplate = false
         
-        // Group networks by status
-        var groupedNetworks: [NetworkStatus: [Network]] = [:]
-        for network in networks {
-            groupedNetworks[network.status, default: []].append(network)
-        }
-        
-        let displayItems = Array(groupedNetworks)
-        let count = displayItems.count
+        let count = networks.count
         
         // Create a new bitmap context for drawing
         guard let bitmap = CGContext(
@@ -195,67 +196,51 @@ class TrayIconManager: ObservableObject {
             return image
         }
         
-        // Calculate grid layout
-        let gridSize = Int(ceil(sqrt(Double(count))))
-        let cellWidth = size.width / CGFloat(gridSize)
-        let cellHeight = size.height / CGFloat(gridSize)
+        let lineHeight = size.height / CGFloat(count)
         
-        // Draw each status/group
-        for (index, item) in displayItems.enumerated() {
-            let (status, networksInGroup) = item
-            let row = index / gridSize
-            let col = index % gridSize
+        // Draw each network as a horizontal line
+        for (index, network) in networks.enumerated() {
+            let y = CGFloat(index) * lineHeight
+            let rect = CGRect(x: 0, y: y, width: size.width, height: lineHeight)
             
-            let x = CGFloat(col) * cellWidth
-            let y = CGFloat(row) * cellHeight
-            let rect = CGRect(x: x, y: y, width: cellWidth, height: cellHeight)
-            
-            // Draw colored rectangle for status
-            let color = status.color
+            // Draw colored line
+            let color = network.status.color
             bitmap.setFillColor(color.cgColor)
             bitmap.fill(rect)
             
-            // Draw count or letter
+            // Draw first letter of network name
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 10, weight: .bold),
+                .font: NSFont.systemFont(ofSize: 6, weight: .bold),
                 .foregroundColor: NSColor.white
             ]
             
-            let text: String
-            if networksInGroup.count == 1 {
-                text = String(networksInGroup[0].name.first ?? "N")
-            } else {
-                text = String(networksInGroup.count)
-            }
-            
-            let textSize = text.size(withAttributes: attributes)
-            let textRect = CGRect(
-                x: x + (cellWidth - textSize.width) / 2,
-                y: y + (cellHeight - textSize.height) / 2,
-                width: textSize.width,
-                height: textSize.height
+            let firstLetter = String(network.name.first ?? "N")
+            let letterSize = firstLetter.size(withAttributes: attributes)
+            let letterRect = CGRect(
+                x: 4,
+                y: y + (lineHeight - letterSize.height) / 2,
+                width: letterSize.width,
+                height: letterSize.height
             )
             
-            text.draw(in: textRect, withAttributes: attributes)
+            firstLetter.draw(in: letterRect, withAttributes: attributes)
         }
         
-        // Draw border around cells
+        // Draw horizontal dividers
         bitmap.setStrokeColor(NSColor.black.cgColor)
         bitmap.setLineWidth(1.0)
         
-        for i in 1..<gridSize {
-            // Vertical lines
-            let x = CGFloat(i) * cellWidth
-            bitmap.move(to: CGPoint(x: x, y: 0))
-            bitmap.addLine(to: CGPoint(x: x, y: size.height))
-            bitmap.strokePath()
-            
-            // Horizontal lines
-            let y = CGFloat(i) * cellHeight
+        for i in 1..<count {
+            let y = CGFloat(i) * lineHeight
             bitmap.move(to: CGPoint(x: 0, y: y))
             bitmap.addLine(to: CGPoint(x: size.width, y: y))
             bitmap.strokePath()
         }
+        
+        // Draw outer border
+        let borderPath = CGPath(rect: CGRect(x: 0, y: 0, width: size.width, height: size.height), transform: nil)
+        bitmap.addPath(borderPath)
+        bitmap.strokePath()
         
         // Create image from context
         if let cgImage = bitmap.makeImage() {
@@ -264,6 +249,7 @@ class TrayIconManager: ObservableObject {
         
         return image
     }
+
     
     private func statusString(for status: NetworkStatus) -> String {
         switch status {
