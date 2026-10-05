@@ -44,7 +44,10 @@ class TrayIconManager: ObservableObject {
                 }
             } else {
                 // Group by status
-                let groupedNetworks = Dictionary(grouping: networks) { $0.status }
+                var groupedNetworks: [NetworkStatus: [Network]] = [:]
+                for network in networks {
+                    groupedNetworks[network.status, default: []].append(network)
+                }
                 for (status, nets) in groupedNetworks {
                     let networkNames = nets.map { $0.name }.joined(separator: ", ")
                     let statusStr = statusString(for: status)
@@ -63,22 +66,120 @@ class TrayIconManager: ObservableObject {
         let image = NSImage(size: size)
         image.isTemplate = false
         
+        // Determine display strategy
+        if networks.count <= 4 {
+            // Use circular sector division for 1-4 networks
+            return createCircularIcon(for: networks, size: size)
+        } else {
+            // Group by status if more than 4 networks
+            return createGroupedIcon(for: networks, size: size)
+        }
+    }
+    
+    private func createCircularIcon(for networks: [Network], size: NSSize) -> NSImage {
+        let image = NSImage(size: size)
+        image.isTemplate = false
+        
+        let count = networks.count
+        
+        // Create a new bitmap context for drawing
+        guard let bitmap = CGContext(
+            data: nil,
+            width: Int(size.width),
+            height: Int(size.height),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
+        ) else {
+            return image
+        }
+        
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        let radius = min(size.width, size.height) / 2
+        
+        // Draw each network as a sector
+        for (index, network) in networks.enumerated() {
+            let startAngle: CGFloat
+            let endAngle: CGFloat
+            
+            switch count {
+            case 1:
+                // Full circle
+                startAngle = 0
+                endAngle = 2 * .pi
+            case 2:
+                // Half circles (vertical split)
+                startAngle = CGFloat(index) * .pi - .pi / 2
+                endAngle = startAngle + .pi
+            case 3:
+                // 120° sectors
+                startAngle = CGFloat(index) * (2 * .pi / 3) - .pi / 2
+                endAngle = startAngle + (2 * .pi / 3)
+            case 4:
+                // 90° quadrants
+                startAngle = CGFloat(index) * (.pi / 2) - .pi / 2
+                endAngle = startAngle + (.pi / 2)
+            default:
+                startAngle = 0
+                endAngle = 2 * .pi
+            }
+            
+            // Draw sector
+            let path = CGMutablePath()
+            path.move(to: center)
+            path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+            path.closeSubpath()
+            
+            let color = network.status.color
+            bitmap.setFillColor(color.cgColor)
+            bitmap.addPath(path)
+            bitmap.fillPath()
+            
+            // Draw first letter of network name
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 10, weight: .bold),
+                .foregroundColor: NSColor.white
+            ]
+            
+            let firstLetter = String(network.name.first ?? "N")
+            let letterSize = firstLetter.size(withAttributes: attributes)
+            
+            // Calculate position in the middle of the sector
+            let midAngle = (startAngle + endAngle) / 2
+            let textRadius = radius * 0.5
+            let textX = center.x + cos(midAngle) * textRadius - letterSize.width / 2
+            let textY = center.y + sin(midAngle) * textRadius - letterSize.height / 2
+            
+            firstLetter.draw(at: CGPoint(x: textX, y: textY), withAttributes: attributes)
+        }
+        
+        // Draw circular border
+        let borderPath = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: size.width, height: size.height), transform: nil)
+        bitmap.addPath(borderPath)
+        bitmap.setStrokeColor(NSColor.black.cgColor)
+        bitmap.setLineWidth(1.0)
+        bitmap.strokePath()
+        
+        // Create image from context
+        if let cgImage = bitmap.makeImage() {
+            return NSImage(cgImage: cgImage, size: size)
+        }
+        
+        return image
+    }
+    
+    private func createGroupedIcon(for networks: [Network], size: NSSize) -> NSImage {
+        let image = NSImage(size: size)
+        image.isTemplate = false
+        
         // Group networks by status
         var groupedNetworks: [NetworkStatus: [Network]] = [:]
         for network in networks {
             groupedNetworks[network.status, default: []].append(network)
         }
         
-        // Determine display strategy
-        let displayItems: [(NetworkStatus, [Network])]
-        if networks.count <= 4 {
-            // Show each network individually
-            displayItems = networks.map { ($0.status, [$0]) }
-        } else {
-            // Group by status if more than 4 networks
-            displayItems = Array(groupedNetworks)
-        }
-        
+        let displayItems = Array(groupedNetworks)
         let count = displayItems.count
         
         // Create a new bitmap context for drawing
