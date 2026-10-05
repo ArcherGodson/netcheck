@@ -23,7 +23,7 @@ A macOS menu-bar application for monitoring network availability across multiple
 
 ### Option 1: Download Binary (Recommended)
 
-1. Download the latest release from [GitHub Releases](https://github.com/YOUR_USERNAME/netcheck/releases)
+1. Download the latest release from [GitHub Releases](https://github.com/archergodson/netcheck/releases)
 2. Extract the archive
 3. Move `NetCheck.app` to `/Applications`
 4. Double-click to launch, or run from Terminal:
@@ -35,7 +35,7 @@ A macOS menu-bar application for monitoring network availability across multiple
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/netcheck.git
+   git clone https://github.com/archergodson/netcheck.git
    cd netcheck
    ```
 
@@ -53,7 +53,7 @@ A macOS menu-bar application for monitoring network availability across multiple
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/netcheck.git
+   git clone https://github.com/archergodson/netcheck.git
    cd netcheck
    ```
 

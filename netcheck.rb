@@ -3,9 +3,9 @@
 
 class Netcheck < Formula
   desc "macOS menu-bar application for monitoring network availability"
-  homepage "https://github.com/yourusername/netcheck"
-  url "https://github.com/yourusername/netcheck/archive/refs/tags/v1.2.0.tar.gz"
-  sha256 "PLACEHOLDER_SHA256" # Update this after creating the release
+  homepage "https://github.com/archergodson/netcheck"
+  url "https://github.com/archergodson/netcheck/archive/refs/tags/v1.2.0.tar.gz"
+  sha256 "266aa798f288d1ece8e842b70ae962ee028c94f67501b21513d7a5297d0a9591"
 
   depends_on macos: :big_sur
 
