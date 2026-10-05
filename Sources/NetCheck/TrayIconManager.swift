@@ -301,10 +301,16 @@ class UnifiedMenuManager {
         
         menu.addItem(NSMenuItem.separator())
         
-        // Add each network as a submenu
-        for network in networks {
+        // Add each network as a submenu with sector icon
+        for (index, network) in networks.enumerated() {
             let networkMenuItem = NSMenuItem(title: network.name, action: nil, keyEquivalent: "")
             networkMenuItem.submenu = createNetworkMenu(for: network)
+            
+            // Add sector icon
+            let icon = createNetworkSectorIcon(for: network, at: index, total: networks.count, size: NSSize(width: 16, height: 16))
+            networkMenuItem.image = icon
+            networkMenuItem.image?.isTemplate = false
+            
             menu.addItem(networkMenuItem)
         }
         
@@ -328,6 +334,87 @@ class UnifiedMenuManager {
         menu.addItem(quitItem)
         
         return menu
+    }
+    
+    private func createNetworkSectorIcon(for network: Network, at index: Int, total: Int, size: NSSize) -> NSImage {
+        let image = NSImage(size: size)
+        image.isTemplate = false
+        
+        let count = total <= 6 ? total : 1 // For >6 networks, show simple circle
+        
+        // Create a new bitmap context for drawing
+        guard let bitmap = CGContext(
+            data: nil,
+            width: Int(size.width),
+            height: Int(size.height),
+            bitsPerComponent: 8,
+            bytesPerRow: 0,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
+        ) else {
+            return image
+        }
+        
+        let center = CGPoint(x: size.width / 2, y: size.height / 2)
+        let radius = min(size.width, size.height) / 2
+        
+        let startAngle: CGFloat
+        let endAngle: CGFloat
+        
+        if total <= 6 {
+            switch count {
+            case 1:
+                startAngle = 0
+                endAngle = 2 * .pi
+            case 2:
+                startAngle = CGFloat(index) * .pi - .pi / 2
+                endAngle = startAngle + .pi
+            case 3:
+                startAngle = CGFloat(index) * (2 * .pi / 3) - .pi / 2
+                endAngle = startAngle + (2 * .pi / 3)
+            case 4:
+                startAngle = CGFloat(index) * (.pi / 2) - .pi / 2
+                endAngle = startAngle + (.pi / 2)
+            case 5:
+                startAngle = CGFloat(index) * (2 * .pi / 5) - .pi / 2
+                endAngle = startAngle + (2 * .pi / 5)
+            case 6:
+                startAngle = CGFloat(index) * (2 * .pi / 6) - .pi / 2
+                endAngle = startAngle + (2 * .pi / 6)
+            default:
+                startAngle = 0
+                endAngle = 2 * .pi
+            }
+        } else {
+            // For >6 networks, show simple circle
+            startAngle = 0
+            endAngle = 2 * .pi
+        }
+        
+        // Draw sector
+        let path = CGMutablePath()
+        path.move(to: center)
+        path.addArc(center: center, radius: radius, startAngle: startAngle, endAngle: endAngle, clockwise: false)
+        path.closeSubpath()
+        
+        let color = network.status.color
+        bitmap.setFillColor(color.cgColor)
+        bitmap.addPath(path)
+        bitmap.fillPath()
+        
+        // Draw border
+        let borderPath = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: size.width, height: size.height), transform: nil)
+        bitmap.addPath(borderPath)
+        bitmap.setStrokeColor(NSColor.black.cgColor)
+        bitmap.setLineWidth(0.5)
+        bitmap.strokePath()
+        
+        // Create image from context
+        if let cgImage = bitmap.makeImage() {
+            return NSImage(cgImage: cgImage, size: size)
+        }
+        
+        return image
     }
     
     private func createNetworkMenu(for network: Network) -> NSMenu {
