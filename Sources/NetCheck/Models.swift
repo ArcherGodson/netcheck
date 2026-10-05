@@ -5,7 +5,7 @@ import SwiftUI
 // Version information
 struct NetCheckVersion {
     static let major = 1
-    static let minor = 1
+    static let minor = 2
     static let patch = 0
     static let versionString = "\(major).\(minor).\(patch)"
 }
