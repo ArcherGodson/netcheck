@@ -5,6 +5,7 @@ class ConfigManager {
     static let shared = ConfigManager()
     
     private let configURL: URL
+    private var verbose: Bool = false
     
     private init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -14,6 +15,10 @@ class ConfigManager {
         try? FileManager.default.createDirectory(at: appDirectory, withIntermediateDirectories: true)
         
         configURL = appDirectory.appendingPathComponent("config.json")
+    }
+    
+    func setVerbose(_ verbose: Bool) {
+        self.verbose = verbose
     }
     
     func loadConfig() -> AppConfig {
@@ -37,7 +42,9 @@ class ConfigManager {
             return cleanConfig
         } catch {
             // If decoding fails (likely due to format change), return default config
-            print("Failed to decode config, using default: \(error)")
+            if verbose {
+                print("Failed to decode config, using default: \(error)")
+            }
             return AppConfig()
         }
     }

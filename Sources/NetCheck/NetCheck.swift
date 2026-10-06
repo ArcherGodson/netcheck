@@ -24,6 +24,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     init(verbose: Bool = false) {
         self.verbose = verbose
         self.config = ConfigManager.shared.loadConfig()
+        ConfigManager.shared.setVerbose(verbose)
         super.init()
     }
     
@@ -50,6 +51,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         for network in config.networks {
             logVerbose("  - \(network.name) (\(network.checks.count) checks)")
         }
+        
+        // Set verbose mode for tray icon manager
+        trayIconManager.setVerbose(verbose)
         
         // Update tray icons
         trayIconManager.updateTrayIcons(for: config.networks)

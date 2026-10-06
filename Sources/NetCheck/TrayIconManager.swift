@@ -7,16 +7,25 @@ class TrayIconManager: ObservableObject {
     private var menuManager: UnifiedMenuManager?
     var onConfigure: (() -> Void)?
     var onRefresh: (() -> Void)?
+    private var verbose: Bool = false
+    
+    func setVerbose(_ verbose: Bool) {
+        self.verbose = verbose
+    }
     
     func updateTrayIcons(for networks: [Network]) {
-        print("TrayIconManager: Updating single icon for \(networks.count) networks")
-        for network in networks {
-            print("TrayIconManager: - \(network.name) (id: \(network.id))")
+        if verbose {
+            print("TrayIconManager: Updating single icon for \(networks.count) networks")
+            for network in networks {
+                print("TrayIconManager: - \(network.name) (id: \(network.id))")
+            }
         }
         
         // Create status item if it doesn't exist
         if statusItem == nil {
-            print("TrayIconManager: Creating new status item")
+            if verbose {
+                print("TrayIconManager: Creating new status item")
+            }
             statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         }
         
@@ -58,7 +67,9 @@ class TrayIconManager: ObservableObject {
             statusItem.button?.toolTip = tooltipLines.joined(separator: "\n")
         }
         
-        print("TrayIconManager: Updated unified icon for \(networks.count) networks")
+        if verbose {
+            print("TrayIconManager: Updated unified icon for \(networks.count) networks")
+        }
     }
     
     private func createUnifiedIcon(for networks: [Network]) -> NSImage {
