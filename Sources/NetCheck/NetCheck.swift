@@ -4,8 +4,11 @@ import SwiftUI
 @main
 struct NetCheck {
     static func main() {
+        let args = CommandLine.arguments
+        let verbose = args.contains("-v") || args.contains("--verbose")
+        
         let app = NSApplication.shared
-        let delegate = AppDelegate()
+        let delegate = AppDelegate(verbose: verbose)
         app.delegate = delegate
         app.run()
     }
@@ -16,8 +19,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     private var trayIconManager = TrayIconManager()
     private var config: AppConfig
     private var timer: Timer?
+    private let verbose: Bool
     
-    override init() {
+    init(verbose: Bool = false) {
+        self.verbose = verbose
         self.config = ConfigManager.shared.loadConfig()
         super.init()
     }
@@ -41,9 +46,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
             createDefaultConfiguration()
         }
         
-        print("Application launched with \(config.networks.count) networks")
+        logVerbose("Application launched with \(config.networks.count) networks")
         for network in config.networks {
-            print("  - \(network.name) (\(network.checks.count) checks)")
+            logVerbose("  - \(network.name) (\(network.checks.count) checks)")
         }
         
         // Update tray icons
@@ -59,6 +64,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
     
     private func createDefaultConfiguration() {
+        log("Creating default configuration")
         let googleNetwork = Network(name: "Google", checks: [
             NetworkCheck(type: .icmp, host: "8.8.8.8"),
             NetworkCheck(type: .dns, host: "google.com")
@@ -87,8 +93,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         var updatedNetworks: [Network] = []
         
         for network in config.networks {
+            let previousStatus = network.status
             let updatedNetwork = await NetworkMonitor.shared.checkNetwork(network)
             updatedNetworks.append(updatedNetwork)
+            
+            if previousStatus != updatedNetwork.status {
+                log("Network '\(network.name)' status changed: \(previousStatus) -> \(updatedNetwork.status)")
+            }
         }
         
         config.networks = updatedNetworks
@@ -106,8 +117,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
     
     private func showConfigWindow() {
-        let configWindow = ConfigWindow(config: config) { [weak self] updatedConfig in
+        let configWindow = ConfigWindow(config: config, verbose: verbose) { [weak self] updatedConfig in
             guard let self = self else { return }
+            
+            let previousNetworks = self.config.networks.map { $0.name }
+            let newNetworks = updatedConfig.networks.map { $0.name }
+            
+            if previousNetworks != newNetworks {
+                log("Configuration changed: networks list updated")
+            }
             
             self.config = updatedConfig
             
@@ -126,5 +144,15 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
         
         configWindow.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+    
+    private func log(_ message: String) {
+        print("NetCheck: \(message)")
+    }
+    
+    private func logVerbose(_ message: String) {
+        if verbose {
+            print("NetCheck [verbose]: \(message)")
+        }
     }
 }

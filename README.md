@@ -49,6 +49,13 @@ A macOS menu-bar application for monitoring network availability across multiple
    ./.build/debug/NetCheck
    ```
 
+4. Run with verbose logging:
+   ```bash
+   ./.build/debug/NetCheck -v
+   # or
+   ./.build/debug/NetCheck --verbose
+   ```
+
 ### Option 3: Use Build Script
 
 1. Clone the repository:

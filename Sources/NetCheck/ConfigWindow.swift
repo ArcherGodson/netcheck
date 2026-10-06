@@ -2,7 +2,7 @@ import SwiftUI
 import AppKit
 
 class ConfigWindow: NSWindow {
-    init(config: AppConfig, onSave: @escaping (AppConfig) -> Void) {
+    init(config: AppConfig, verbose: Bool = false, onSave: @escaping (AppConfig) -> Void) {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 1200, height: 900),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -11,7 +11,7 @@ class ConfigWindow: NSWindow {
         )
         
         self.title = "NetCheck Configuration"
-        let contentView = ConfigView(config: config, onSave: onSave, window: self)
+        let contentView = ConfigView(config: config, verbose: verbose, onSave: onSave, window: self)
         let hostingController = NSHostingController(rootView: contentView)
         self.contentViewController = hostingController
         
@@ -20,16 +20,24 @@ class ConfigWindow: NSWindow {
         self.center()
         self.minSize = NSSize(width: 1000, height: 800)
         
-        DiagnosticLogger.shared.log("ConfigWindow initialized with size: \(self.frame.size)")
+        // Enable text field editing and clipboard support
+        self.makeKey()
+        
+        if verbose {
+            DiagnosticLogger.shared.log("ConfigWindow initialized with size: \(self.frame.size)")
+        }
     }
 }
 
 struct ConfigView: View {
     @ObservedObject private var viewModel: ConfigViewModel
+    private let verbose: Bool
     private let onSave: (AppConfig) -> Void
     let window: NSWindow
     
-    init(config: AppConfig, onSave: @escaping (AppConfig) -> Void, window: NSWindow) {
+    init(config: AppConfig, verbose: Bool = false, onSave: @escaping (AppConfig) -> Void, window: NSWindow) {
+        self.verbose = verbose
+        DiagnosticLogger.shared.setVerbose(verbose)
         self.viewModel = ConfigViewModel(config: config)
         self.onSave = { updatedConfig in
             // Save immediately to ConfigManager
@@ -40,7 +48,9 @@ struct ConfigView: View {
             onSave(updatedConfig)
         }
         self.window = window
-        DiagnosticLogger.shared.log("ConfigView initialized with \(config.networks.count) networks")
+        if verbose {
+            DiagnosticLogger.shared.log("ConfigView initialized with \(config.networks.count) networks")
+        }
     }
     
     var body: some View {
@@ -59,19 +69,19 @@ struct ConfigView: View {
                         .font(.body)
                         .foregroundColor(.secondary)
                     
-                    Text("\(Int(viewModel.config.checkInterval))")
-                        .font(.body)
-                        .fontWeight(.medium)
-                    
-                    Stepper("", value: Binding(
+                    TextField("Interval", value: Binding(
                         get: { viewModel.config.checkInterval },
                         set: { newValue in
-                            DiagnosticLogger.shared.log("Interval changed to: \(newValue)")
-                            viewModel.config.checkInterval = newValue
+                            if verbose {
+                                DiagnosticLogger.shared.log("Interval changed to: \(newValue)")
+                            }
+                            viewModel.config.checkInterval = max(1, min(300, newValue))
                             onSave(viewModel.config)
                         }
-                    ), in: 5...300, step: 5)
-                        .labelsHidden()
+                    ), formatter: NumberFormatter())
+                        .textFieldStyle(.roundedBorder)
+                        .font(.body)
+                        .frame(width: 60)
                     
                     Text("seconds")
                         .font(.body)
@@ -91,8 +101,10 @@ struct ConfigView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     ForEach($viewModel.config.networks) { $network in
-                        NetworkEditorView(network: $network, onDelete: {
-                            DiagnosticLogger.shared.log("Delete button pressed for network: \(network.name)")
+                        NetworkEditorView(network: $network, verbose: verbose, onDelete: {
+                            if verbose {
+                                DiagnosticLogger.shared.log("Delete button pressed for network: \(network.name)")
+                            }
                             if let index = viewModel.config.networks.firstIndex(where: { $0.id == network.id }) {
                                 viewModel.config.networks.remove(at: index)
                                 onSave(viewModel.config)
@@ -112,7 +124,9 @@ struct ConfigView: View {
             // Bottom buttons
             HStack(spacing: 16) {
                 Button(action: {
-                    DiagnosticLogger.shared.log("Add Network button pressed")
+                    if verbose {
+                        DiagnosticLogger.shared.log("Add Network button pressed")
+                    }
                     let newNetwork = Network(name: "New Network")
                     viewModel.config.networks.append(newNetwork)
                     onSave(viewModel.config)
@@ -126,7 +140,9 @@ struct ConfigView: View {
                 Spacer()
                 
                 Button("Save") {
-                    DiagnosticLogger.shared.log("Save button pressed")
+                    if verbose {
+                        DiagnosticLogger.shared.log("Save button pressed")
+                    }
                     onSave(viewModel.config)
                     window.close()
                 }
@@ -135,7 +151,9 @@ struct ConfigView: View {
                 .keyboardShortcut(.defaultAction)
                 
                 Button("Cancel") {
-                    DiagnosticLogger.shared.log("Cancel button pressed")
+                    if verbose {
+                        DiagnosticLogger.shared.log("Cancel button pressed")
+                    }
                     window.close()
                 }
                 .buttonStyle(.bordered)
@@ -154,6 +172,7 @@ struct ConfigView: View {
 
 struct NetworkEditorView: View {
     @Binding var network: Network
+    let verbose: Bool
     let onDelete: () -> Void
     let onSave: () -> Void
     
@@ -187,7 +206,9 @@ struct NetworkEditorView: View {
                 Spacer()
                 
                 Button(action: {
-                    DiagnosticLogger.shared.log("Delete button pressed for network: \(network.name)")
+                    if verbose {
+                        DiagnosticLogger.shared.log("Delete button pressed for network: \(network.name)")
+                    }
                     onDelete()
                 }) {
                     Label("Delete", systemImage: "trash")
@@ -210,7 +231,9 @@ struct NetworkEditorView: View {
                     Spacer()
                     
                     Button(action: {
-                        DiagnosticLogger.shared.log("Add Check button pressed")
+                        if verbose {
+                            DiagnosticLogger.shared.log("Add Check button pressed")
+                        }
                         let newCheck = NetworkCheck(type: .tcp, host: "", port: 80)
                         network.checks.append(newCheck)
                         onSave()
@@ -225,8 +248,10 @@ struct NetworkEditorView: View {
                 // Checks list
                 VStack(spacing: 8) {
                     ForEach($network.checks) { $check in
-                        CheckRow(check: $check, onDelete: {
-                            DiagnosticLogger.shared.log("Remove Check button pressed")
+                        CheckRow(check: $check, verbose: verbose, onDelete: {
+                            if verbose {
+                                DiagnosticLogger.shared.log("Remove Check button pressed")
+                            }
                             if let index = network.checks.firstIndex(where: { $0.id == check.id }) {
                                 network.checks.remove(at: index)
                                 onSave()
@@ -245,6 +270,7 @@ struct NetworkEditorView: View {
 }
 struct CheckRow: View {
     @Binding var check: NetworkCheck
+    let verbose: Bool
     let onDelete: () -> Void
     let onSave: () -> Void
     
@@ -276,7 +302,9 @@ struct CheckRow: View {
                     .frame(width: 10, height: 10)
                 
                 Button(action: {
-                    DiagnosticLogger.shared.log("CheckRow Remove button pressed")
+                    if verbose {
+                        DiagnosticLogger.shared.log("CheckRow Remove button pressed")
+                    }
                     onDelete()
                 }) {
                     Label("Remove", systemImage: "trash")
@@ -370,6 +398,7 @@ struct CheckRow: View {
 class DiagnosticLogger {
     static let shared = DiagnosticLogger()
     private let fileURL: URL
+    private var verbose: Bool = false
     
     private init() {
         let paths = FileManager.default.urls(for: .desktopDirectory, in: .userDomainMask)
@@ -381,14 +410,20 @@ class DiagnosticLogger {
         log("DiagnosticLogger initialized")
     }
     
+    func setVerbose(_ verbose: Bool) {
+        self.verbose = verbose
+    }
+    
     func log(_ message: String) {
         let timestamp = ISO8601DateFormatter().string(from: Date())
         let logMessage = "[\(timestamp)] \(message)\n"
         
-        // Also print to console for immediate feedback
-        print("NetCheck UI: \(message)")
+        // Only print to console if verbose
+        if verbose {
+            print("NetCheck UI: \(message)")
+        }
         
-        // Log to file
+        // Always log to file
         if let data = logMessage.data(using: .utf8) {
             if let handle = try? FileHandle(forWritingTo: fileURL) {
                 handle.seekToEndOfFile()
