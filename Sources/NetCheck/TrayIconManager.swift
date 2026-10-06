@@ -73,7 +73,7 @@ class TrayIconManager: ObservableObject {
     }
     
     private func createUnifiedIcon(for networks: [Network]) -> NSImage {
-        let size = NSSize(width: 32, height: 32)
+        let size = NSSize(width: 16, height: 16)
         let image = NSImage(size: size)
         image.isTemplate = false
         
@@ -157,7 +157,7 @@ class TrayIconManager: ObservableObject {
             
             // Draw first letter of network name
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 8, weight: .bold),
+                .font: NSFont.systemFont(ofSize: 5, weight: .bold),
                 .foregroundColor: NSColor.white
             ]
             
@@ -177,7 +177,7 @@ class TrayIconManager: ObservableObject {
         let borderPath = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: size.width, height: size.height), transform: nil)
         bitmap.addPath(borderPath)
         bitmap.setStrokeColor(NSColor.black.cgColor)
-        bitmap.setLineWidth(1.0)
+        bitmap.setLineWidth(0.5)
         bitmap.strokePath()
         
         // Create image from context
@@ -221,14 +221,14 @@ class TrayIconManager: ObservableObject {
             
             // Draw first letter of network name
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 6, weight: .bold),
+                .font: NSFont.systemFont(ofSize: 4, weight: .bold),
                 .foregroundColor: NSColor.white
             ]
             
             let firstLetter = String(network.name.first ?? "N")
             let letterSize = firstLetter.size(withAttributes: attributes)
             let letterRect = CGRect(
-                x: 4,
+                x: 2,
                 y: y + (lineHeight - letterSize.height) / 2,
                 width: letterSize.width,
                 height: letterSize.height
@@ -239,7 +239,7 @@ class TrayIconManager: ObservableObject {
         
         // Draw horizontal dividers
         bitmap.setStrokeColor(NSColor.black.cgColor)
-        bitmap.setLineWidth(1.0)
+        bitmap.setLineWidth(0.5)
         
         for i in 1..<count {
             let y = CGFloat(i) * lineHeight
@@ -318,7 +318,7 @@ class UnifiedMenuManager {
             networkMenuItem.submenu = createNetworkMenu(for: network)
             
             // Add sector icon
-            let icon = createNetworkSectorIcon(for: network, at: index, total: networks.count, size: NSSize(width: 16, height: 16))
+            let icon = createNetworkSectorIcon(for: network, at: index, total: networks.count, size: NSSize(width: 8, height: 8))
             networkMenuItem.image = icon
             networkMenuItem.image?.isTemplate = false
             
