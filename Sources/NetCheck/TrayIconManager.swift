@@ -173,13 +173,6 @@ class TrayIconManager: ObservableObject {
             firstLetter.draw(at: CGPoint(x: textX, y: textY), withAttributes: attributes)
         }
         
-        // Draw circular border
-        let borderPath = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: size.width, height: size.height), transform: nil)
-        bitmap.addPath(borderPath)
-        bitmap.setStrokeColor(NSColor.black.cgColor)
-        bitmap.setLineWidth(0.5)
-        bitmap.strokePath()
-        
         // Create image from context
         if let cgImage = bitmap.makeImage() {
             return NSImage(cgImage: cgImage, size: size)
@@ -236,22 +229,6 @@ class TrayIconManager: ObservableObject {
             
             firstLetter.draw(in: letterRect, withAttributes: attributes)
         }
-        
-        // Draw horizontal dividers
-        bitmap.setStrokeColor(NSColor.black.cgColor)
-        bitmap.setLineWidth(0.5)
-        
-        for i in 1..<count {
-            let y = CGFloat(i) * lineHeight
-            bitmap.move(to: CGPoint(x: 0, y: y))
-            bitmap.addLine(to: CGPoint(x: size.width, y: y))
-            bitmap.strokePath()
-        }
-        
-        // Draw outer border
-        let borderPath = CGPath(rect: CGRect(x: 0, y: 0, width: size.width, height: size.height), transform: nil)
-        bitmap.addPath(borderPath)
-        bitmap.strokePath()
         
         // Create image from context
         if let cgImage = bitmap.makeImage() {
@@ -412,13 +389,6 @@ class UnifiedMenuManager {
         bitmap.setFillColor(color.cgColor)
         bitmap.addPath(path)
         bitmap.fillPath()
-        
-        // Draw border
-        let borderPath = CGPath(ellipseIn: CGRect(x: 0, y: 0, width: size.width, height: size.height), transform: nil)
-        bitmap.addPath(borderPath)
-        bitmap.setStrokeColor(NSColor.black.cgColor)
-        bitmap.setLineWidth(0.5)
-        bitmap.strokePath()
         
         // Create image from context
         if let cgImage = bitmap.makeImage() {
