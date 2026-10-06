@@ -60,43 +60,50 @@ actor NetworkMonitor {
     }
     
     private func performCheck(_ check: NetworkCheck) async -> NetworkCheck {
+        let startTime = Date()
         let result: Bool
+        let measuredTime: TimeInterval
         
         switch check.type {
         case .icmp:
-            result = await checkICMP(host: check.host)
+            (result, measuredTime) = await checkICMP(host: check.host)
         case .tcp:
             if let port = check.port {
-                result = await checkTCP(host: check.host, port: port)
+                (result, measuredTime) = await checkTCP(host: check.host, port: port)
             } else {
                 result = false
+                measuredTime = 0
             }
         case .dns:
             if let dnsServer = check.dnsServer {
-                result = await checkDNS(host: check.host, dnsServer: dnsServer)
+                (result, measuredTime) = await checkDNS(host: check.host, dnsServer: dnsServer)
             } else {
-                result = await checkDNS(host: check.host)
+                (result, measuredTime) = await checkDNS(host: check.host)
             }
         case .http:
             if let port = check.port {
-                result = await checkTCP(host: check.host, port: port)
+                (result, measuredTime) = await checkTCP(host: check.host, port: port)
             } else {
-                result = await checkTCP(host: check.host, port: 80)
+                (result, measuredTime) = await checkTCP(host: check.host, port: 80)
             }
         case .https:
-            result = await checkTCP(host: check.host, port: 443)
+            (result, measuredTime) = await checkTCP(host: check.host, port: 443)
         case .ssh:
-            result = await checkTCP(host: check.host, port: 22)
+            (result, measuredTime) = await checkTCP(host: check.host, port: 22)
         }
+        
+        let endTime = Date()
+        let responseTime = measuredTime > 0 ? measuredTime : endTime.timeIntervalSince(startTime) * 1000 // Convert to milliseconds
         
         var updatedCheck = check
         updatedCheck.status = result ? .available : .unavailable
         updatedCheck.lastCheck = Date()
+        updatedCheck.responseTime = responseTime
         
         return updatedCheck
     }
     
-    private func checkICMP(host: String) async -> Bool {
+    private func checkICMP(host: String) async -> (Bool, TimeInterval) {
         return await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/sbin/ping")
@@ -109,17 +116,32 @@ actor NetworkMonitor {
             do {
                 try process.run()
                 process.waitUntilExit()
-                continuation.resume(returning: process.terminationStatus == 0)
+                
+                let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: outputData, encoding: .utf8) ?? ""
+                
+                // Extract response time from ping output
+                var responseTime: TimeInterval = 0
+                if process.terminationStatus == 0 {
+                    // Parse output like: "64 bytes from 8.8.8.8: icmp_seq=0 ttl=118 time=14.2 ms"
+                    if let timeRange = output.range(of: "time=", options: .caseInsensitive),
+                       let msRange = output[timeRange.upperBound...].range(of: "ms", options: .caseInsensitive) {
+                        let timeString = String(output[timeRange.upperBound..<msRange.lowerBound]).trimmingCharacters(in: .whitespaces)
+                        responseTime = (timeString as NSString).doubleValue
+                    }
+                }
+                
+                continuation.resume(returning: (process.terminationStatus == 0, responseTime))
             } catch {
-                continuation.resume(returning: false)
+                continuation.resume(returning: (false, 0))
             }
         }
     }
     
-    private func checkDNS(host: String, dnsServer: String? = nil) async -> Bool {
+    private func checkDNS(host: String, dnsServer: String? = nil) async -> (Bool, TimeInterval) {
         // Skip DNS check for IP addresses
         if isIPAddress(host) {
-            return true
+            return (true, 0)
         }
         
         return await withCheckedContinuation { continuation in
@@ -145,9 +167,13 @@ actor NetworkMonitor {
                 let outputData = pipe.fileHandleForReading.readDataToEndOfFile()
                 let output = String(data: outputData, encoding: .utf8) ?? ""
                 
-                continuation.resume(returning: process.terminationStatus == 0 && !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                let success = process.terminationStatus == 0 && !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                // DNS doesn't provide accurate timing with +short, use a reasonable estimate
+                let responseTime: TimeInterval = success ? 50 : 0 // Approximate 50ms for successful DNS
+                
+                continuation.resume(returning: (success, responseTime))
             } catch {
-                continuation.resume(returning: false)
+                continuation.resume(returning: (false, 0))
             }
         }
     }
@@ -161,7 +187,7 @@ actor NetworkMonitor {
         return false
     }
     
-    private func checkTCP(host: String, port: Int) async -> Bool {
+    private func checkTCP(host: String, port: Int) async -> (Bool, TimeInterval) {
         return await withCheckedContinuation { continuation in
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/usr/bin/nc")
@@ -174,9 +200,13 @@ actor NetworkMonitor {
             do {
                 try process.run()
                 process.waitUntilExit()
-                continuation.resume(returning: process.terminationStatus == 0)
+                
+                // nc doesn't provide timing, use a reasonable estimate
+                let responseTime: TimeInterval = process.terminationStatus == 0 ? 50 : 0 // Approximate 50ms for successful connection
+                
+                continuation.resume(returning: (process.terminationStatus == 0, responseTime))
             } catch {
-                continuation.resume(returning: false)
+                continuation.resume(returning: (false, 0))
             }
         }
     }

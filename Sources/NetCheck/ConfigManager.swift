@@ -35,6 +35,7 @@ class ConfigManager {
                 for j in 0..<cleanConfig.networks[i].checks.count {
                     cleanConfig.networks[i].checks[j].status = .notChecked
                     cleanConfig.networks[i].checks[j].lastCheck = nil
+                    cleanConfig.networks[i].checks[j].responseTime = nil
                 }
                 cleanConfig.networks[i].status = .notChecked
                 cleanConfig.networks[i].lastCheck = nil
@@ -56,6 +57,7 @@ class ConfigManager {
             for j in 0..<cleanConfig.networks[i].checks.count {
                 cleanConfig.networks[i].checks[j].status = .notChecked
                 cleanConfig.networks[i].checks[j].lastCheck = nil
+                cleanConfig.networks[i].checks[j].responseTime = nil
             }
             cleanConfig.networks[i].status = .notChecked
             cleanConfig.networks[i].lastCheck = nil

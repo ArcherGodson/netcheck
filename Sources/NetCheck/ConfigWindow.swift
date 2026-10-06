@@ -301,6 +301,11 @@ struct CheckRow: View {
                     .fill(check.status.colorSwiftUI)
                     .frame(width: 10, height: 10)
                 
+                Text(check.responseTimeString)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 50, alignment: .trailing)
+                
                 Button(action: {
                     if verbose {
                         DiagnosticLogger.shared.log("CheckRow Remove button pressed")

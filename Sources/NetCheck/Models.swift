@@ -5,8 +5,8 @@ import SwiftUI
 // Version information
 struct NetCheckVersion {
     static let major = 1
-    static let minor = 5
-    static let patch = 1
+    static let minor = 6
+    static let patch = 0
     static let versionString = "\(major).\(minor).\(patch)"
 }
 
@@ -55,6 +55,7 @@ struct NetworkCheck: Codable, Identifiable {
     var dnsServer: String?
     var status: CheckStatus
     var lastCheck: Date?
+    var responseTime: TimeInterval? // Response time in milliseconds
     
     init(type: CheckType, host: String, port: Int? = nil, dnsServer: String? = nil) {
         self.id = UUID()
@@ -64,6 +65,7 @@ struct NetworkCheck: Codable, Identifiable {
         self.dnsServer = dnsServer
         self.status = .notChecked
         self.lastCheck = nil
+        self.responseTime = nil
     }
     
     // For saving to config file (without dynamic status)
@@ -95,6 +97,7 @@ struct NetworkCheck: Codable, Identifiable {
         self.dnsServer = config.dnsServer
         self.status = .notChecked
         self.lastCheck = nil
+        self.responseTime = nil
     }
     
     var description: String {
@@ -121,6 +124,13 @@ struct NetworkCheck: Codable, Identifiable {
         case .ssh:
             return "SSH: \(host)"
         }
+    }
+    
+    var responseTimeString: String {
+        guard let responseTime = responseTime else {
+            return "N/A"
+        }
+        return String(format: "%.0fms", responseTime)
     }
 }
 
