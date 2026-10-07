@@ -432,7 +432,8 @@ class UnifiedMenuManager {
             }
             
             let responseTimeStr = check.responseTimeString
-            let checkItem = NSMenuItem(title: "\(status) \(check.description) (\(responseTimeStr))", action: nil, keyEquivalent: "")
+            let timeStr = check.lastCheckString
+            let checkItem = NSMenuItem(title: "\(status) \(check.description) (\(responseTimeStr)) - \(timeStr)", action: nil, keyEquivalent: "")
             checkItem.isEnabled = false
             menu.addItem(checkItem)
         }

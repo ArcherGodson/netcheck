@@ -200,6 +200,10 @@ struct NetworkEditorView: View {
                         Circle()
                             .fill(network.status.colorSwiftUI)
                             .frame(width: 10, height: 10)
+                        
+                        Text(network.lastCheckString)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
                 }
                 
@@ -305,6 +309,11 @@ struct CheckRow: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                     .frame(width: 50, alignment: .trailing)
+                
+                Text(check.lastCheckString)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .frame(width: 80, alignment: .trailing)
                 
                 Button(action: {
                     if verbose {

@@ -151,12 +151,12 @@ class AppDelegate: NSObject, NSApplicationDelegate, @unchecked Sendable {
     }
     
     private func log(_ message: String) {
-        print("NetCheck: \(message)")
+        print("\(Date()): \(message)")
     }
     
     private func logVerbose(_ message: String) {
         if verbose {
-            print("NetCheck [verbose]: \(message)")
+            print("\(Date()) [verbose]: \(message)")
         }
     }
 }

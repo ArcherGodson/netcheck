@@ -132,6 +132,28 @@ struct NetworkCheck: Codable, Identifiable {
         }
         return String(format: "%.0fms", responseTime)
     }
+    
+    var lastCheckString: String {
+        guard let lastCheck = lastCheck else {
+            return "Never"
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .medium
+        return formatter.string(from: lastCheck)
+    }
+    
+    var lastCheckDetailedString: String {
+        guard let lastCheck = lastCheck else {
+            return "Never"
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .short
+        formatter.timeStyle = .medium
+        return formatter.string(from: lastCheck)
+    }
 }
 
 enum NetworkStatus: Equatable, Codable {
@@ -204,6 +226,17 @@ struct Network: Codable, Identifiable {
         self.checks = original.checks
         self.status = original.status
         self.lastCheck = original.lastCheck
+    }
+    
+    var lastCheckString: String {
+        guard let lastCheck = lastCheck else {
+            return "Never"
+        }
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .none
+        formatter.timeStyle = .medium
+        return formatter.string(from: lastCheck)
     }
 }
 
